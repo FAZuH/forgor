@@ -16,4 +16,4 @@ new_without_default = "allow"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_yml = "0.0.12"
 thiserror = "2.0.18"
-tokio = { version = "1.51.1", features = ["macros", "rt-multi-thread", "signal"] }
+tokio = { version = "1.51.1", features = ["rt-multi-thread", "macros", "signal"] }

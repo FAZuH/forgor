@@ -1,18 +1,19 @@
 use std::sync::OnceLock;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::SystemTime;
+use std::time::UNIX_EPOCH;
 
 static LOG_LEVEL: OnceLock<u8> = OnceLock::new();
 
-const RESET:  &str = "\x1b[0m";
-const BOLD:   &str = "\x1b[1m";
-const DIM:    &str = "\x1b[2m";
+pub const RESET: &str = "\x1b[0m";
+pub const BOLD: &str = "\x1b[1m";
+pub const DIM: &str = "\x1b[2m";
 
-const RED:    &str = "\x1b[31m";
-const YELLOW: &str = "\x1b[33m";
-const CYAN:   &str = "\x1b[36m";
-const WHITE:  &str = "\x1b[37m";
+pub const RED: &str = "\x1b[31m";
+pub const YELLOW: &str = "\x1b[33m";
+pub const CYAN: &str = "\x1b[36m";
+pub const WHITE: &str = "\x1b[37m";
 
-const BG_RED: &str = "\x1b[41m";
+pub const BG_RED: &str = "\x1b[41m";
 
 #[macro_export]
 macro_rules! error {
@@ -88,15 +89,15 @@ pub fn log_level() -> u8 {
             .as_deref()
         {
             Ok("error") => 1,
-            Ok("warn")  => 2,
-            Ok("info")  => 3,
+            Ok("warn") => 2,
+            Ok("info") => 3,
             Ok("debug") => 4,
-            _           => 0,
+            _ => 0,
         }
     })
 }
 
-fn timestamp() -> String {
+pub fn timestamp() -> String {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default();
@@ -107,4 +108,3 @@ fn timestamp() -> String {
     let ms = now.subsec_millis();
     format!("{:02}:{:02}:{:02}.{:03}", h, m, s, ms)
 }
-
