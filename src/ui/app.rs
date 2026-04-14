@@ -15,26 +15,6 @@ use crate::ui::view::SettingsView;
 use crate::ui::view::TimerView;
 use crate::ui::view::TimerViewActions;
 
-#[derive(Debug, thiserror::Error)]
-pub enum AppBuildError {
-    #[error("missing config")]
-    MissingConfig,
-    #[error("missing pomodoro")]
-    MissingPomodoro,
-    #[error("missing home_view")]
-    MissingHomeView,
-    #[error("missing timer_view")]
-    MissingTimerView,
-    #[error("missing settings_view")]
-    MissingSettingsView,
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum AppError {
-    #[error(transparent)]
-    Pomodoro(#[from] PomodoroError),
-}
-
 pub struct App {
     active_page: Page,
     home: HomeController,
@@ -140,22 +120,22 @@ impl AppBuilder {
     }
 }
 
-impl TryFrom<Input> for TimerViewActions {
-    type Error = ();
+#[derive(Debug, thiserror::Error)]
+pub enum AppBuildError {
+    #[error("missing config")]
+    MissingConfig,
+    #[error("missing pomodoro")]
+    MissingPomodoro,
+    #[error("missing home_view")]
+    MissingHomeView,
+    #[error("missing timer_view")]
+    MissingTimerView,
+    #[error("missing settings_view")]
+    MissingSettingsView,
+}
 
-    fn try_from(value: Input) -> Result<TimerViewActions, ()> {
-        use Input::*;
-        use TimerViewActions::*;
-        let ret = match value {
-            Left => Sub1Min,
-            Down => Sub5Min,
-            Right => Add1Min,
-            Up => Add5Min,
-            Char(' ') => TogglePause,
-            Backspace => ResetSession,
-            Enter => SkipSession,
-            _ => return Err(()),
-        };
-        Ok(ret)
-    }
+#[derive(Debug, thiserror::Error)]
+pub enum AppError {
+    #[error(transparent)]
+    Pomodoro(#[from] PomodoroError),
 }

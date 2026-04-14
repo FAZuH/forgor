@@ -43,11 +43,10 @@ impl TuiRunner {
     }
 
     pub fn run(&mut self) -> Result<(), UiError> {
-        enable_raw_mode().map_err(|e| UiError::from(TuiError::from(e)))?;
+        enable_raw_mode().map_err(TuiError::from)?;
         let mut stdout = std::io::stdout();
-        execute!(stdout, EnterAlternateScreen).map_err(|e| UiError::from(TuiError::from(e)))?;
-        let mut terminal = Terminal::new(CrosstermBackend::new(stdout))
-            .map_err(|e| UiError::from(TuiError::from(e)))?;
+        execute!(stdout, EnterAlternateScreen).map_err(TuiError::from)?;
+        let mut terminal = Terminal::new(CrosstermBackend::new(stdout)).map_err(TuiError::from)?;
 
         let renderer = TuiRenderer::new();
 
@@ -71,14 +70,10 @@ impl TuiRunner {
             let cmds = self.app.render();
             terminal
                 .draw(|f| renderer.flush(f, cmds))
-                .map_err(|e| UiError::from(TuiError::from(e)))?;
+                .map_err(TuiError::from)?;
 
-            if event::poll(Duration::from_millis(100))
-                .map_err(|e| UiError::from(TuiError::from(e)))?
-            {
-                if let Event::Key(key) =
-                    event::read().map_err(|e| UiError::from(TuiError::from(e)))?
-                {
+            if event::poll(Duration::from_millis(100)).map_err(TuiError::from)? {
+                if let Event::Key(key) = event::read().map_err(TuiError::from)? {
                     if let Some(input) = Input::from_keyevent(key) {
                         let nav = self.app.handle(input)?;
                         if matches!(nav, Navigation::Quit) {
