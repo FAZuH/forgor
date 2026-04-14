@@ -51,6 +51,21 @@ impl TuiRunner {
 
         let renderer = TuiRenderer::new();
 
+        let res = self.run_loop(&mut terminal, &renderer);
+
+        // Unconditionally ignore errors for cleanup
+        let _ = disable_raw_mode();
+        let _ = execute!(terminal.backend_mut(), LeaveAlternateScreen);
+        let _ = terminal.show_cursor();
+
+        res
+    }
+
+    fn run_loop(
+        &mut self,
+        terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+        renderer: &TuiRenderer,
+    ) -> Result<(), UiError> {
         loop {
             self.app.tick()?;
             let cmds = self.app.render();
@@ -74,11 +89,6 @@ impl TuiRunner {
                 }
             }
         }
-
-        disable_raw_mode().map_err(|e| UiError::from(TuiError::from(e)))?;
-        execute!(terminal.backend_mut(), LeaveAlternateScreen)
-            .map_err(|e| UiError::from(TuiError::from(e)))?;
-
         Ok(())
     }
 }
