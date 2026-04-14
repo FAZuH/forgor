@@ -27,10 +27,7 @@ impl TuiHomeRenderer {
     }
 
     fn render_welcome(&self, frame: &mut Frame) {
-        let ascii = ascii_font()
-            .convert(&format!("Welcome to {APP_NAME}!"))
-            .unwrap()
-            .to_string();
+        let ascii = ascii_font().convert(APP_NAME).unwrap().to_string();
         let area = centered_ascii(&ascii, frame.area());
         let p = Paragraph::new(ascii);
         frame.render_widget(p, area);
@@ -115,7 +112,7 @@ impl TuiRenderer {
 
 fn centered_ascii(ascii: &str, area: Rect) -> Rect {
     let lines = ascii.lines().count() as u16;
-    let cols = ascii.lines().map(|l| l.len()).max().unwrap_or(0) as u16;
+    let cols = ascii.lines().map(|l| l.chars().count()).max().unwrap_or(0) as u16;
 
     let area = centered_rect(cols, lines, area);
     area
