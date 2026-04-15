@@ -26,10 +26,10 @@ impl TimerController {
     pub fn handle(&mut self, action: TimerViewActions) -> Result<Navigation, PomodoroError> {
         use TimerViewActions::*;
         match action {
+            Add30Sec => self.model.add(Duration::from_secs(30)),
             Add1Min => self.model.add(Duration::from_mins(1)),
-            Add5Min => self.model.add(Duration::from_mins(5)),
+            Sub30Sec => self.model.subtract(Duration::from_secs(30)),
             Sub1Min => self.model.subtract(Duration::from_mins(1)),
-            Sub5Min => self.model.subtract(Duration::from_mins(5)),
             TogglePause => self.model.toggle_pause(),
             SkipSession => self.model.skip(),
             ResetSession => self.model.reset(),

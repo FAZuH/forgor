@@ -159,7 +159,7 @@ impl TuiTimerRenderer {
     }
 
     fn shortcuts(&self, frame: &mut Frame, area: Rect) {
-        let text = "Space: Pause  Enter: Skip  Backspace: Reset  \u{2190}\u{2192}: \u{00b1}1m  \u{2191}\u{2193}: \u{00b1}5m  q: Quit";
+        let text = "Space: Pause  Enter: Skip  Backspace: Reset  \u{2190}\u{2192}: \u{00b1}30s  \u{2191}\u{2193}: \u{00b1}1m  q: Quit";
         let p = Paragraph::new(text)
             .style(Style::default().fg(Color::DarkGray))
             .alignment(Alignment::Center);
