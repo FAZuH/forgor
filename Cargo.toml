@@ -1,5 +1,5 @@
 [package]
-name = "forgor"
+name = "tomo"
 # Version will be updated by CI in `release` branch.
 # Avoid modifying version manually or it will break CI
 
