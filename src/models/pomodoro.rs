@@ -5,19 +5,29 @@ use PomodoroState::*;
 
 #[derive(Clone, Debug)]
 pub struct Pomodoro {
+    // Session config
     focus: Duration,
     long_break: Duration,
     short_break: Duration,
 
     long_interval: u32,
 
+    // Aggregate session stats
+    total_sessions: u32,
+    focus_sessions: u32,
+    /// Accumulated running time from previous segments (before current anchor).
+    accumulated: Duration,
+
+    // Session data
     running: bool,
     state: PomodoroState,
 
-    focus_sessions: u32,
-
-    started_at: Option<Instant>,
-    remaining_time: Option<Duration>,
+    /// Anchor instant for the current running segment.
+    /// Always set when running, None when paused.
+    anchor: Option<Instant>,
+    /// Remaining time frozen at pause, or session duration at start/reset.
+    /// When running, actual remaining is `frozen_remaining - anchor.elapsed()`.
+    frozen_remaining: Duration,
 }
 
 impl Pomodoro {
@@ -36,6 +46,11 @@ impl Pomodoro {
         }
     }
 
+    /// Starts the Pomodoro session timer.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PomodoroError::Running`] if the session is running.
     pub fn start(&mut self) -> Result<(), PomodoroError> {
         self.check_not_running()?;
         self.running = true;
@@ -43,80 +58,51 @@ impl Pomodoro {
         Ok(())
     }
 
-    pub fn tick(&mut self) -> Result<(), PomodoroError> {
-        if let (Some(started_at), Some(remaining)) = (self.started_at, self.remaining_time) {
-            let elapsed = started_at.elapsed();
-            let remaining = remaining.saturating_sub(elapsed);
-            self.remaining_time = Some(remaining);
-        }
-        Ok(())
-    }
+    /// No-op. Remaining and total time are computed on-the-fly from the
+    /// anchor instant, eliminating drift.
+    pub fn update(&mut self) {}
 
     /// Adds given duration to session's remaining time.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`PomodoroError::NotRunning`] if the session is not running.
-    pub fn add(&mut self, duration: Duration) -> Result<(), PomodoroError> {
-        self.check_running()?;
-        if let Some(remaining) = self.remaining_time.as_mut() {
-            *remaining += duration;
-        } else {
-            return Err(PomodoroError::UnexpectedState(
-                "Remaining is None when pomodoro is running".to_string(),
-            ));
-        }
-        Ok(())
+    pub fn add(&mut self, duration: Duration) {
+        self.frozen_remaining += duration;
     }
 
     /// Subtracts given duration from session's remaining time.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`PomodoroError::Running`] if session is running.
-    pub fn subtract(&mut self, duration: Duration) -> Result<(), PomodoroError> {
-        self.check_running()?;
-        if let Some(remaining) = self.remaining_time.as_mut() {
-            *remaining -= duration;
-        } else {
-            return Err(PomodoroError::UnexpectedState(
-                "Remaining is None when pomodoro is running".to_string(),
-            ));
-        }
-        Ok(())
+    pub fn subtract(&mut self, duration: Duration) {
+        self.frozen_remaining = self.frozen_remaining.saturating_sub(duration);
     }
 
-    /// Ticks timer state and disables running state.
+    /// Freezes remaining time and disables running state.
     ///
     /// # Errors
     ///
     /// Returns [`PomodoroError::NotRunning`] if the session is not running.
     pub fn pause(&mut self) -> Result<(), PomodoroError> {
         self.check_running()?;
-
         self.running = false;
-        self.tick()?;
-        self.started_at = None;
-
+        self.frozen_remaining = self.remaining_time();
+        if let Some(anchor) = self.anchor {
+            self.accumulated += anchor.elapsed();
+        }
+        self.anchor = None;
         Ok(())
     }
 
-    /// Resumes timer state.
+    /// Resumes timer.
     ///
     /// # Errors
     ///
     /// Returns [`PomodoroError::Running`] if session is running.
     pub fn resume(&mut self) -> Result<(), PomodoroError> {
         self.check_not_running()?;
-
         self.running = true;
-        self.started_at = Some(Instant::now());
-
+        self.anchor = Some(Instant::now());
         Ok(())
     }
 
     /// Toggles paused state.
     pub fn toggle_pause(&mut self) {
+        // Guaranteed to not panic
         if self.running {
             self.pause().unwrap()
         } else {
@@ -125,26 +111,14 @@ impl Pomodoro {
     }
 
     /// Skips to the next session.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`PomodoroError::NotRunning`] if the session is not running.
-    pub fn skip(&mut self) -> Result<(), PomodoroError> {
-        self.check_running()?;
+    pub fn skip(&mut self) {
         self.next_state();
         self.reset_time();
-        Ok(())
     }
 
     /// Resets timer of current running session.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`PomodoroError::NotRunning`] if the session is not running.
-    pub fn reset(&mut self) -> Result<(), PomodoroError> {
-        self.check_running()?;
+    pub fn reset(&mut self) {
         self.reset_time();
-        Ok(())
     }
 
     pub fn state(&self) -> PomodoroState {
@@ -159,12 +133,27 @@ impl Pomodoro {
         self.focus_sessions
     }
 
-    pub fn started_at(&self) -> Option<Instant> {
-        self.started_at.clone()
+    pub fn total_sessions(&self) -> u32 {
+        self.total_sessions
     }
 
-    pub fn remaining_time(&self) -> Option<Duration> {
-        self.remaining_time.clone()
+    pub fn started_at(&self) -> Option<Instant> {
+        self.anchor
+    }
+
+    pub fn total_time(&self) -> Duration {
+        self.accumulated + self.anchor.map_or(Duration::ZERO, |a| a.elapsed())
+    }
+
+    pub fn remaining_time(&self) -> Duration {
+        match self.anchor {
+            Some(anchor) => self.frozen_remaining.saturating_sub(anchor.elapsed()),
+            None => self.frozen_remaining,
+        }
+    }
+
+    pub fn long_interval(&self) -> u32 {
+        self.long_interval
     }
 
     /// Gets session duration based on current state.
@@ -178,13 +167,20 @@ impl Pomodoro {
     }
 
     fn reset_time(&mut self) {
-        self.started_at = Some(Instant::now());
-        self.remaining_time = Some(self.session_duration());
+        if let Some(anchor) = self.anchor {
+            self.accumulated += anchor.elapsed();
+        }
+        self.frozen_remaining = self.session_duration();
+        self.anchor = if self.running {
+            Some(Instant::now())
+        } else {
+            None
+        };
     }
 
     /// Returns [`PomodoroError::NotRunning`] if session is not running yet.
     fn check_running(&self) -> Result<(), PomodoroError> {
-        if !self.running {
+        if !self.is_running() {
             return Err(PomodoroError::NotRunning);
         }
         Ok(())
@@ -192,7 +188,7 @@ impl Pomodoro {
 
     /// Returns [`PomodoroError::Running`] if session is running.
     fn check_not_running(&self) -> Result<(), PomodoroError> {
-        if self.running {
+        if self.is_running() {
             return Err(PomodoroError::Running);
         }
         Ok(())
@@ -200,6 +196,7 @@ impl Pomodoro {
 
     /// Sets session state based on previous state.
     fn next_state(&mut self) {
+        self.total_sessions += 1;
         match self.state {
             Focus => {
                 self.focus_sessions += 1;
@@ -217,15 +214,17 @@ impl Pomodoro {
 impl Default for Pomodoro {
     fn default() -> Self {
         Self {
-            state: Default::default(),
+            state: PomodoroState::Focus,
             focus: Duration::from_mins(25),
             long_break: Duration::from_mins(15),
             short_break: Duration::from_mins(5),
             long_interval: 3,
             focus_sessions: 0,
+            total_sessions: 0,
+            accumulated: Duration::ZERO,
             running: false,
-            remaining_time: None,
-            started_at: None,
+            frozen_remaining: Duration::from_mins(25),
+            anchor: None,
         }
     }
 }
@@ -235,12 +234,6 @@ pub enum PomodoroState {
     Focus,
     LongBreak,
     ShortBreak,
-}
-
-impl Default for PomodoroState {
-    fn default() -> Self {
-        Self::Focus
-    }
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -265,7 +258,7 @@ mod tests {
         pomo.state = ShortBreak;
 
         pomo.next_state();
-        assert_eq!(pomo.state, Focus)
+        assert_eq!(pomo.state(), Focus)
     }
 
     #[test]
@@ -273,7 +266,7 @@ mod tests {
         let mut pomo = Pomodoro::default();
 
         pomo.next_state();
-        assert_eq!(pomo.state, ShortBreak)
+        assert_eq!(pomo.state(), ShortBreak)
     }
 
     #[test]
@@ -291,7 +284,7 @@ mod tests {
 
         // Long Break
         pomo.next_state();
-        assert_eq!(pomo.state, LongBreak)
+        assert_eq!(pomo.state(), LongBreak)
     }
 
     #[test]
@@ -310,18 +303,48 @@ mod tests {
 
     #[test]
     fn test_skip() {
-        let mut pomo = Pomodoro::default();
-        pomo.focus_sessions = 1;
-        pomo.state = Focus;
-        pomo.running = true;
-        pomo.started_at = None;
-        pomo.remaining_time = None;
+        let mut pomo = Pomodoro {
+            focus_sessions: 1,
+            total_sessions: 1,
+            state: Focus,
+            running: true,
+            anchor: None,
+            ..Default::default()
+        };
 
-        pomo.skip().unwrap();
+        pomo.skip();
 
-        assert_eq!(pomo.focus_sessions, 2);
-        assert_ne!(pomo.started_at, None);
-        assert_ne!(pomo.remaining_time, None);
+        assert_eq!((pomo.focus_sessions(), pomo.total_sessions()), (2, 2));
+        assert_eq!(pomo.state(), ShortBreak);
+
+        assert_ne!(pomo.started_at(), None);
+        let diff = pomo
+            .session_duration()
+            .saturating_sub(pomo.remaining_time());
+        assert!(diff < Duration::from_secs(1));
+    }
+
+    #[test]
+    fn test_session_counts() {
+        // 0 0
+        let mut pomo = Pomodoro {
+            focus_sessions: 0,
+            total_sessions: 0,
+            state: Focus,
+            long_interval: 2,
+            ..Default::default()
+        };
+        pomo.start().unwrap();
+
+        // 1 1
+        pomo.skip();
+        assert_eq!((pomo.focus_sessions(), pomo.total_sessions()), (1, 1));
+        // 1 2
+        pomo.skip();
+        assert_eq!((pomo.focus_sessions(), pomo.total_sessions()), (1, 2));
+        // 2 3
+        pomo.skip();
+        assert_eq!((pomo.focus_sessions(), pomo.total_sessions()), (2, 3));
     }
 
     #[test]
@@ -331,24 +354,87 @@ mod tests {
         pomo.start().unwrap();
 
         pomo.pause().unwrap();
-        assert!(!pomo.running);
-        assert_eq!(pomo.started_at, None);
+        assert!(!pomo.is_running());
+        assert_eq!(pomo.started_at(), None);
 
         pomo.resume().unwrap();
-        assert!(pomo.running);
-        assert_ne!(pomo.started_at, None);
+        assert!(pomo.is_running());
+        assert_ne!(pomo.started_at(), None);
     }
 
     #[test]
     fn test_add() {
         let mut pomo = Pomodoro::default();
-        pomo.remaining_time = Some(Duration::from_secs(67));
-        pomo.running = true;
+        pomo.frozen_remaining = Duration::from_secs(67);
+        pomo.running = false;
 
-        pomo.add(Duration::from_secs(2)).unwrap();
-        assert_eq!(pomo.remaining_time, Some(Duration::from_secs(69)));
+        pomo.add(Duration::from_secs(2));
+        assert_eq!(pomo.remaining_time(), Duration::from_secs(69));
 
-        pomo.subtract(Duration::from_secs(2)).unwrap();
-        assert_eq!(pomo.remaining_time, Some(Duration::from_secs(67)));
+        pomo.subtract(Duration::from_secs(2));
+        assert_eq!(pomo.remaining_time(), Duration::from_secs(67));
+    }
+
+    #[test]
+    fn test_update() {
+        let past = Instant::now().checked_sub(Duration::from_secs(1)).unwrap();
+
+        let mut pomo = Pomodoro {
+            frozen_remaining: Duration::from_secs(67),
+            anchor: Some(past),
+            accumulated: Duration::ZERO,
+            running: true,
+            ..Default::default()
+        };
+
+        let remaining = pomo.remaining_time().as_secs();
+        assert!(remaining <= 66, "Expected <= 66, got {}", remaining);
+        assert!(remaining >= 65, "Expected >= 65, got {}", remaining);
+
+        let total = pomo.total_time().as_secs();
+        assert!(total >= 1, "Expected total_time >= 1, got {}", total);
+    }
+
+    #[test]
+    fn test_anchor_no_drift() {
+        let past = Instant::now().checked_sub(Duration::from_secs(10)).unwrap();
+
+        let mut pomo = Pomodoro {
+            frozen_remaining: Duration::from_secs(67),
+            anchor: Some(past),
+            accumulated: Duration::from_secs(5),
+            running: true,
+            ..Default::default()
+        };
+
+        for _ in 0..100 {
+            pomo.update();
+        }
+
+        let remaining = pomo.remaining_time().as_secs();
+        assert!(remaining <= 57, "Expected <= 57, got {}", remaining);
+        assert!(remaining >= 56, "Expected >= 56, got {}", remaining);
+
+        let total = pomo.total_time().as_secs();
+        assert!(total >= 15, "Expected total_time >= 15, got {}", total);
+    }
+
+    #[test]
+    fn test_pause_resume_accumulates_total_time() {
+        let mut pomo = Pomodoro::default();
+        pomo.start().unwrap();
+
+        std::thread::sleep(Duration::from_millis(50));
+        pomo.pause().unwrap();
+
+        let total_after_pause = pomo.total_time();
+        assert!(total_after_pause >= Duration::from_millis(40));
+
+        pomo.resume().unwrap();
+        std::thread::sleep(Duration::from_millis(50));
+        pomo.pause().unwrap();
+
+        let total_after_second_pause = pomo.total_time();
+        assert!(total_after_second_pause >= total_after_pause + Duration::from_millis(40));
     }
 }

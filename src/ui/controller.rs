@@ -51,22 +51,21 @@ impl TimerController {
     pub fn handle(&mut self, action: TimerViewActions) -> Result<Navigation, PomodoroError> {
         use TimerViewActions::*;
         match action {
-            Add1Min => self.model.add(Duration::from_mins(1))?,
-            Add5Min => self.model.add(Duration::from_mins(5))?,
-            Sub1Min => self.model.subtract(Duration::from_mins(1))?,
-            Sub5Min => self.model.subtract(Duration::from_mins(5))?,
+            Add1Min => self.model.add(Duration::from_mins(1)),
+            Add5Min => self.model.add(Duration::from_mins(5)),
+            Sub1Min => self.model.subtract(Duration::from_mins(1)),
+            Sub5Min => self.model.subtract(Duration::from_mins(5)),
             TogglePause => self.model.toggle_pause(),
-            SkipSession => self.model.skip()?,
-            ResetSession => self.model.reset()?,
-            GoHome => return Ok(Navigation::GoTo(Page::Home)),
+            SkipSession => self.model.skip(),
+            ResetSession => self.model.reset(),
             GoSettings => return Ok(Navigation::GoTo(Page::Settings)),
             Quit => return Ok(Navigation::Quit),
         }
         Ok(Navigation::Stay)
     }
 
-    pub fn tick(&mut self) -> Result<(), PomodoroError> {
-        self.model.tick()
+    pub fn tick(&mut self) {
+        self.model.update();
     }
 
     pub fn render(&self) -> Vec<TimerRenderCommand> {
@@ -76,12 +75,18 @@ impl TimerController {
 }
 
 impl From<&Pomodoro> for TimerViewState {
-    fn from(value: &Pomodoro) -> Self {
+    fn from(v: &Pomodoro) -> Self {
+        let remaining = v.remaining_time();
+        let progress_perc = 1.0 - (remaining.as_secs_f64() / v.session_duration().as_secs_f64());
         Self {
-            remaining: value.remaining_time().unwrap_or(value.session_duration()),
-            total: value.session_duration(),
-            state: value.state(),
-            paused: !value.is_running(),
+            remaining,
+            total: v.session_duration(),
+            state: v.state(),
+            running: v.is_running(),
+            long_interval: v.long_interval(),
+            total_sessions: v.total_sessions(),
+            focus_sessions: v.focus_sessions(),
+            progress_perc,
         }
     }
 }
