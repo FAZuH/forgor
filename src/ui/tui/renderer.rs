@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use figlet_rs::Toilet;
 use ratatui::layout::Constraint;
+use ratatui::layout::Flex;
 use ratatui::layout::Layout;
 use ratatui::layout::Rect;
 use ratatui::prelude::*;
@@ -33,46 +34,11 @@ impl TuiTimerRenderer {
             }
         }
 
-        let label_data = state.map(|s| {
-            let (label, color) = match s {
-                PomodoroState::Focus => ("FOCUS", Color::Red),
-                PomodoroState::ShortBreak => ("SHORT BREAK", Color::Green),
-                PomodoroState::LongBreak => ("LONG BREAK", Color::Blue),
-            };
-            let text = if pause_indicator {
-                format!("{}\n\n  ( PAUSED )", label)
-            } else {
-                label.to_string()
-            };
-            let ascii = Toilet::future()
-                .unwrap()
-                .convert(&text)
-                .unwrap()
-                .to_string();
-            let height = ascii.lines().count() as u16;
-            (ascii, color, height)
-        });
-
-        let timer_data = timer.map(|d| {
-            let time_str = format_duration_clock(&d);
-            let ascii = Toilet::mono12()
-                .unwrap()
-                .convert(&time_str)
-                .unwrap()
-                .to_string();
-            let width = ascii.lines().map(|l| l.chars().count()).max().unwrap_or(0) as u16;
-            let height = ascii.lines().count() as u16;
-            (ascii, width, height)
-        });
-
-        let label_height = label_data.as_ref().map_or(0, |d| d.2);
-        let timer_height = timer_data.as_ref().map_or(0, |d| d.2);
-
         let rows = Layout::vertical([
             Constraint::Fill(1),
-            Constraint::Length(label_height.max(1)),
+            Constraint::Length(3),
             Constraint::Length(2),
-            Constraint::Length(timer_height.max(1)),
+            Constraint::Length(9),
             Constraint::Length(1),
             Constraint::Length(1),
             Constraint::Length(1),
@@ -82,29 +48,36 @@ impl TuiTimerRenderer {
         ])
         .split(frame.area());
 
-        if let Some((ascii, color, _)) = label_data {
-            self.session_label(frame, rows[1], &ascii, color);
+        if let Some(state) = state {
+            self.session_label(frame, rows[1], state, pause_indicator);
         }
 
-        if let Some((ascii, width, height)) = timer_data {
-            self.display(frame, rows[3], &ascii, width, height);
+        if let Some(remaining) = timer {
+            self.timer(
+                frame,
+                rows[3],
+                &remaining,
+                state.map(session_color).unwrap_or(Color::White),
+            );
         }
 
-        self.progress_bar(frame, rows[4], progress);
+        self.progress_bar(
+            frame,
+            rows[4],
+            progress,
+            state.map(session_color).unwrap_or(Color::Cyan),
+        );
 
         if let Some(TimerRenderCommand::Stats {
-            remaining,
-            total,
             long_interval,
             total_sessions,
             focus_sessions,
+            ..
         }) = stats
         {
             self.stats(
                 frame,
                 rows[6],
-                &remaining,
-                &total,
                 long_interval,
                 total_sessions,
                 focus_sessions,
@@ -114,23 +87,66 @@ impl TuiTimerRenderer {
         self.shortcuts(frame, rows[8]);
     }
 
-    fn display(&self, frame: &mut Frame, area: Rect, ascii: &str, width: u16, height: u16) {
-        let area = area.centered(Constraint::Length(width), Constraint::Length(height));
-        let p = Paragraph::new(ascii).alignment(Alignment::Center);
-        frame.render_widget(p, area);
+    fn session_label(&self, frame: &mut Frame, area: Rect, state: PomodoroState, paused: bool) {
+        // TODO: Pre-compute this and store ascii instead
+        let (label, color) = match state {
+            PomodoroState::Focus => ("FOCUS", Color::LightRed),
+            PomodoroState::ShortBreak => ("SHORT BREAK", Color::LightGreen),
+            PomodoroState::LongBreak => ("LONG BREAK", Color::LightCyan),
+        };
+        let label = Self::ascii_future(label);
+        let center = Alignment::Center;
+
+        if paused {
+            let paused_label = Self::ascii_future(" ( PAUSED )");
+
+            let [area_label, area_paused] = Layout::horizontal([
+                Constraint::Length(Self::string_width(&label) as u16),
+                Constraint::Length(Self::string_width(&paused_label) as u16),
+            ])
+            .flex(Flex::Center)
+            .areas::<2>(area);
+
+            let p_label = Paragraph::new(label)
+                .style(Style::default().fg(color).add_modifier(Modifier::BOLD))
+                .alignment(center);
+            let p_paused = Paragraph::new(paused_label).style(
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD),
+            );
+
+            frame.render_widget(&p_label, area_label);
+            frame.render_widget(&p_paused, area_paused);
+        } else {
+            let p = Paragraph::new(label)
+                .style(Style::default().fg(color))
+                .alignment(center);
+            frame.render_widget(p, area);
+        }
     }
 
-    fn session_label(&self, frame: &mut Frame, area: Rect, ascii: &str, color: Color) {
+    fn timer(&self, frame: &mut Frame, area: Rect, remaining: &Duration, color: Color) {
+        let time_str = format_duration_clock(remaining);
+        let ascii = Self::ascii_mono12(time_str);
+
+        let width = Self::string_width(&ascii) as u16;
+        let height = Self::string_height(&ascii) as u16;
+        let area = area.centered(Constraint::Length(width), Constraint::Length(height));
+
         let p = Paragraph::new(ascii)
             .style(Style::default().fg(color).add_modifier(Modifier::BOLD))
             .alignment(Alignment::Center);
         frame.render_widget(p, area);
     }
 
-    fn progress_bar(&self, frame: &mut Frame, area: Rect, progress: f64) {
+    fn progress_bar(&self, frame: &mut Frame, area: Rect, progress: f64, color: Color) {
         let gauge = Gauge::default()
             .ratio(progress.clamp(0.0, 1.0))
-            .gauge_style(Style::default().fg(Color::Cyan));
+            .use_unicode(true)
+            .gauge_style(Style::default().fg(color));
+        let layout = Layout::horizontal([Constraint::Length(55)]).flex(Flex::Center);
+        let area = area.layout::<1>(&layout)[0];
         frame.render_widget(gauge, area);
     }
 
@@ -138,32 +154,77 @@ impl TuiTimerRenderer {
         &self,
         frame: &mut Frame,
         area: Rect,
-        remaining: &Duration,
-        total: &Duration,
         long_interval: u32,
         total_sessions: u32,
         focus_sessions: u32,
     ) {
-        let text = format!(
-            "{} / {}  │  Sessions: {}/{}  │  Long break every: {}",
-            format_duration_human(remaining),
-            format_duration_human(total),
-            focus_sessions,
-            total_sessions,
-            long_interval,
-        );
-        let p = Paragraph::new(text)
-            .style(Style::default().fg(Color::DarkGray))
-            .alignment(Alignment::Center);
+        let dim = Style::default().dim();
+        let bright = Style::default();
+        let line = Line::from(vec![
+            Span::styled("Focused: ", dim),
+            Span::styled(focus_sessions.to_string(), bright),
+            Span::styled("  │  Sessions: ", dim),
+            Span::styled(total_sessions.to_string(), bright),
+            Span::styled("  │  Long break every: ", dim),
+            Span::styled(long_interval.to_string(), bright),
+        ]);
+        let p = Paragraph::new(line).alignment(Alignment::Center);
         frame.render_widget(p, area);
     }
 
     fn shortcuts(&self, frame: &mut Frame, area: Rect) {
-        let text = "Space: Pause  Enter: Skip  Backspace: Reset  \u{2190}\u{2192}: \u{00b1}30s  \u{2191}\u{2193}: \u{00b1}1m  q: Quit";
-        let p = Paragraph::new(text)
-            .style(Style::default().fg(Color::DarkGray))
-            .alignment(Alignment::Center);
+        let dim = Style::default().dim();
+        let bright = Style::default();
+        let sep = Span::styled(" • ", dim);
+        let line = Line::from(vec![
+            Span::styled("Space", bright),
+            Span::styled(": Pause", dim),
+            sep.clone(),
+            Span::styled("Enter", bright),
+            Span::styled(": Skip", dim),
+            sep.clone(),
+            Span::styled("Backspace", bright),
+            Span::styled(": Reset", dim),
+            sep.clone(),
+            Span::styled("←→", bright),
+            Span::styled(": ±30s", dim),
+            sep.clone(),
+            Span::styled("↑↓", bright),
+            Span::styled(": ±1m", dim),
+            sep.clone(),
+            Span::styled("q", bright),
+            Span::styled(": Quit", dim),
+        ]);
+        let p = Paragraph::new(line).alignment(Alignment::Center);
         frame.render_widget(p, area);
+    }
+
+    fn string_width(text: impl AsRef<str>) -> usize {
+        text.as_ref()
+            .lines()
+            .map(|l| l.chars().count())
+            .max()
+            .unwrap_or(0)
+    }
+
+    fn string_height(text: impl AsRef<str>) -> usize {
+        text.as_ref().lines().count()
+    }
+
+    fn ascii_mono12(text: impl AsRef<str>) -> String {
+        Toilet::mono12()
+            .unwrap()
+            .convert(text.as_ref())
+            .unwrap()
+            .to_string()
+    }
+
+    fn ascii_future(text: impl AsRef<str>) -> String {
+        Toilet::future()
+            .unwrap()
+            .convert(text.as_ref())
+            .unwrap()
+            .to_string()
     }
 }
 
@@ -208,17 +269,10 @@ fn format_duration_clock(d: &Duration) -> String {
     format!("{:02}:{:02}", secs / 60, secs % 60)
 }
 
-fn format_duration_human(d: &Duration) -> String {
-    let total_secs = d.as_secs();
-    let hrs = total_secs / 3600;
-    let mins = (total_secs % 3600) / 60;
-    let secs = total_secs % 60;
-    match (hrs, mins, secs) {
-        (0, 0, s) => format!("{s}s"),
-        (0, m, 0) => format!("{m}m"),
-        (0, m, s) => format!("{m}m{s}s"),
-        (h, 0, 0) => format!("{h}h"),
-        (h, m, 0) => format!("{h}h{m}m"),
-        (h, m, s) => format!("{h}h{m}m{s}s"),
+fn session_color(state: PomodoroState) -> Color {
+    match state {
+        PomodoroState::Focus => Color::LightBlue,
+        PomodoroState::ShortBreak => Color::LightGreen,
+        PomodoroState::LongBreak => Color::LightCyan,
     }
 }
