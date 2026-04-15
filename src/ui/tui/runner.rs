@@ -21,7 +21,6 @@ use crate::ui::app::AppBuildError;
 use crate::ui::error::UiError;
 use crate::ui::tui::TuiError;
 use crate::ui::tui::renderer::TuiRenderer;
-use crate::ui::tui::view::TuiHomeView;
 use crate::ui::tui::view::TuiSettingsView;
 use crate::ui::tui::view::TuiTimerView;
 
@@ -34,7 +33,6 @@ impl TuiRunner {
         let app = App::builder()
             .pomodoro(pomodoro)
             .config(config)
-            .home_view(Box::new(TuiHomeView::new()))
             .timer_view(Box::new(TuiTimerView::new()))
             .settings_view(Box::new(TuiSettingsView::new()))
             .build()?;

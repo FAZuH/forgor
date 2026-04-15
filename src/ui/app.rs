@@ -5,11 +5,8 @@ use crate::ui::FromInput;
 use crate::ui::Input;
 use crate::ui::Navigation;
 use crate::ui::Page;
-use crate::ui::controller::HomeController;
 use crate::ui::controller::SettingsController;
 use crate::ui::controller::TimerController;
-use crate::ui::view::HomeView;
-use crate::ui::view::HomeViewActions;
 use crate::ui::view::RenderCommand;
 use crate::ui::view::SettingsView;
 use crate::ui::view::TimerView;
@@ -17,7 +14,6 @@ use crate::ui::view::TimerViewActions;
 
 pub struct App {
     active_page: Page,
-    home: HomeController,
     timer: TimerController,
     settings: SettingsController,
 }
@@ -29,10 +25,6 @@ impl App {
 
     pub fn handle(&mut self, input: Input) -> Result<Navigation, AppError> {
         match self.active_page {
-            Page::Home => match HomeViewActions::from_input(input) {
-                Some(action) => Ok(self.home.handle(action)),
-                None => Ok(Navigation::Stay),
-            },
             Page::Timer => match TimerViewActions::from_input(input) {
                 Some(action) => Ok(self.timer.handle(action)?),
                 None => Ok(Navigation::Stay),
@@ -53,7 +45,6 @@ impl App {
 
     pub fn render(&self) -> Vec<RenderCommand> {
         let cmd = match self.active_page {
-            Page::Home => RenderCommand::Home(self.home.render()),
             Page::Timer => RenderCommand::Timer(self.timer.render()),
             Page::Settings => RenderCommand::Settings(self.settings.render()),
         };
@@ -67,7 +58,6 @@ pub struct AppBuilder {
     pomodoro: Option<Pomodoro>,
     page: Option<Page>,
 
-    home_view: Option<Box<dyn HomeView>>,
     timer_view: Option<Box<dyn TimerView>>,
     settings_view: Option<Box<dyn SettingsView>>,
 }
@@ -75,8 +65,7 @@ pub struct AppBuilder {
 impl AppBuilder {
     pub fn build(self) -> Result<App, AppBuildError> {
         Ok(App {
-            active_page: self.page.unwrap_or(Page::Home),
-            home: HomeController::new(self.home_view.ok_or(AppBuildError::MissingHomeView)?),
+            active_page: self.page.unwrap_or(Page::Timer),
             timer: TimerController::new(
                 self.timer_view.ok_or(AppBuildError::MissingTimerView)?,
                 self.pomodoro.ok_or(AppBuildError::MissingPomodoro)?,
@@ -104,11 +93,6 @@ impl AppBuilder {
         self
     }
 
-    pub fn home_view(mut self, view: Box<dyn HomeView>) -> Self {
-        self.home_view = Some(view);
-        self
-    }
-
     pub fn timer_view(mut self, view: Box<dyn TimerView>) -> Self {
         self.timer_view = Some(view);
         self
@@ -126,8 +110,6 @@ pub enum AppBuildError {
     MissingConfig,
     #[error("missing pomodoro")]
     MissingPomodoro,
-    #[error("missing home_view")]
-    MissingHomeView,
     #[error("missing timer_view")]
     MissingTimerView,
     #[error("missing settings_view")]

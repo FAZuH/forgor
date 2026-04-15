@@ -6,7 +6,6 @@ pub mod view;
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
 pub enum Page {
-    Home,
     Timer,
     Settings,
 }

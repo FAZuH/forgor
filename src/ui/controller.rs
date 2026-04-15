@@ -5,9 +5,6 @@ use crate::models::Pomodoro;
 use crate::models::pomodoro::PomodoroError;
 use crate::ui::Navigation;
 use crate::ui::Page;
-use crate::ui::view::HomeRenderCommand;
-use crate::ui::view::HomeView;
-use crate::ui::view::HomeViewActions;
 use crate::ui::view::SettingsRenderCommand;
 use crate::ui::view::SettingsView;
 use crate::ui::view::SettingsViewState;
@@ -15,28 +12,6 @@ use crate::ui::view::TimerRenderCommand;
 use crate::ui::view::TimerView;
 use crate::ui::view::TimerViewActions;
 use crate::ui::view::TimerViewState;
-
-pub struct HomeController {
-    view: Box<dyn HomeView>,
-}
-
-impl HomeController {
-    pub fn new(view: Box<dyn HomeView>) -> Self {
-        Self { view }
-    }
-
-    pub fn handle(&self, action: HomeViewActions) -> Navigation {
-        match action {
-            HomeViewActions::GoToTimer => Navigation::GoTo(Page::Timer),
-            HomeViewActions::GoToSettings => Navigation::GoTo(Page::Settings),
-            HomeViewActions::Quit => Navigation::Quit,
-        }
-    }
-
-    pub fn render(&self) -> Vec<HomeRenderCommand> {
-        self.view.render()
-    }
-}
 
 pub struct TimerController {
     view: Box<dyn TimerView>,

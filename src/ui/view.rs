@@ -3,30 +3,11 @@ use std::time::Duration;
 use crate::models::pomodoro::PomodoroState;
 use crate::ui::FromInput;
 use crate::ui::Input;
-use crate::ui::Page;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum RenderCommand {
-    Home(Vec<HomeRenderCommand>),
     Timer(Vec<TimerRenderCommand>),
     Settings(Vec<SettingsRenderCommand>),
-}
-
-pub trait HomeView {
-    fn render(&self) -> Vec<HomeRenderCommand>;
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum HomeRenderCommand {
-    WelcomeText,
-    NavButton(String, Page),
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum HomeViewActions {
-    GoToTimer,
-    GoToSettings,
-    Quit,
 }
 
 pub trait TimerView {
@@ -55,7 +36,6 @@ pub enum TimerViewActions {
     SkipSession,
     ResetSession,
 
-    GoHome,
     GoSettings,
     Quit,
 }
@@ -101,21 +81,6 @@ impl FromInput for TimerViewActions {
             Char(' ') => TogglePause,
             Backspace => ResetSession,
             Enter => SkipSession,
-            _ => return None,
-        };
-        Some(ret)
-    }
-}
-
-impl FromInput for HomeViewActions {
-    fn from_input(input: Input) -> Option<Self> {
-        use HomeViewActions::*;
-        use Input::*;
-        let ret = match input {
-            Right => GoToSettings,
-            Enter => GoToTimer,
-            Esc => Quit,
-            Char('q') => Quit,
             _ => return None,
         };
         Some(ret)

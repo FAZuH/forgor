@@ -7,32 +7,10 @@ use ratatui::layout::Rect;
 use ratatui::prelude::*;
 use ratatui::widgets::Paragraph;
 
-use crate::APP_NAME;
 use crate::models::pomodoro::PomodoroState;
-use crate::ui::view::HomeRenderCommand;
 use crate::ui::view::RenderCommand;
 use crate::ui::view::SettingsRenderCommand;
 use crate::ui::view::TimerRenderCommand;
-
-struct TuiHomeRenderer;
-
-impl TuiHomeRenderer {
-    fn render(&self, frame: &mut Frame, cmds: Vec<HomeRenderCommand>) {
-        for cmd in cmds {
-            match cmd {
-                HomeRenderCommand::WelcomeText => self.render_welcome(frame),
-                HomeRenderCommand::NavButton(label, page) => todo!(),
-            }
-        }
-    }
-
-    fn render_welcome(&self, frame: &mut Frame) {
-        let ascii = ascii_font().convert(APP_NAME).unwrap().to_string();
-        let area = centered_ascii(&ascii, frame.area());
-        let p = Paragraph::new(ascii);
-        frame.render_widget(p, area);
-    }
-}
 
 struct TuiTimerRenderer;
 
@@ -85,7 +63,6 @@ impl TuiSettingsRenderer {
 }
 
 pub struct TuiRenderer {
-    home: TuiHomeRenderer,
     timer: TuiTimerRenderer,
     settings: TuiSettingsRenderer,
 }
@@ -93,7 +70,6 @@ pub struct TuiRenderer {
 impl TuiRenderer {
     pub fn new() -> Self {
         Self {
-            home: TuiHomeRenderer,
             timer: TuiTimerRenderer,
             settings: TuiSettingsRenderer,
         }
@@ -102,7 +78,6 @@ impl TuiRenderer {
     pub fn flush(&self, frame: &mut Frame, commands: Vec<RenderCommand>) {
         for cmd in commands {
             match cmd {
-                RenderCommand::Home(cmds) => self.home.render(frame, cmds),
                 RenderCommand::Timer(cmds) => self.timer.render(frame, cmds),
                 RenderCommand::Settings(cmds) => self.settings.render(frame, cmds),
             }
