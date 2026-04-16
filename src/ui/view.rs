@@ -114,8 +114,91 @@ pub enum SettingsViewActions {
     Navigate(Navigation),
 }
 
+impl FromInput for SettingsViewActions {
+    fn from_input(input: Input) -> Option<Self> {
+        use Input::*;
+        use SettingsViewActions::*;
+        let ret = match input {
+            Up => SelectUp,
+            Down => SelectDown,
+            Enter => EditSelection,
+            Esc => Navigate(Navigation::GoTo(Page::Timer)),
+            Backspace => todo!(),
+            Char(char) => match char {
+                'j' => SelectDown,
+                'k' => SelectUp,
+                'q' => Navigate(Navigation::Quit),
+                _ => return None,
+            },
+            _ => return None,
+        };
+        Some(ret)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SectionLayout {
+    Vertical,
+    Horizontal,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SettingsRenderCommand {
-    SettingsHeader,
-    SettingsField { label: String, value: String },
+    Title,
+    Section {
+        label: String,
+        children: Vec<Self>,
+    },
+    SubSection {
+        label: String,
+        layout: SectionLayout,
+        children: Vec<Self>,
+    },
+    Input {
+        label: String,
+        value: String,
+    },
+    Checkbox {
+        label: String,
+        value: bool,
+    },
+}
+
+impl SettingsRenderCommand {
+    pub fn section(label: impl ToString, children: Vec<Self>) -> Self {
+        Self::Section {
+            label: label.to_string(),
+            children,
+        }
+    }
+
+    pub fn subsection(label: impl ToString, children: Vec<Self>) -> Self {
+        Self::SubSection {
+            label: label.to_string(),
+            layout: SectionLayout::Vertical,
+            children,
+        }
+    }
+
+    pub fn subsection_horizontal(label: impl ToString, children: Vec<Self>) -> Self {
+        Self::SubSection {
+            label: label.to_string(),
+            layout: SectionLayout::Horizontal,
+            children,
+        }
+    }
+
+    pub fn input(label: impl ToString, value: impl ToString) -> Self {
+        Self::Input {
+            label: label.to_string(),
+            value: value.to_string(),
+        }
+    }
+
+    pub fn checkbox(label: impl ToString, value: bool) -> Self {
+        Self::Checkbox {
+            label: label.to_string(),
+            value,
+        }
+    }
 }
