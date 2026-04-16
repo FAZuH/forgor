@@ -118,10 +118,10 @@ impl From<&Config> for SettingsViewState {
     fn from(value: &Config) -> Self {
         let timer = value.pomodoro.timer.clone();
         Self {
-            focus: timer.focus,
-            short: timer.short,
-            long: timer.long,
-            long_interval: timer.long_interval,
+            timer_focus: timer.focus,
+            timer_short: timer.short,
+            timer_long: timer.long,
+            timer_long_interval: timer.long_interval,
         }
     }
 }

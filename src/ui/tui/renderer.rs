@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use figlet_rs::Toilet;
 use ratatui::layout::Constraint;
 use ratatui::layout::Flex;
 use ratatui::layout::Layout;
@@ -13,6 +12,7 @@ use crate::models::pomodoro::PomodoroState;
 use crate::ui::view::RenderCommand;
 use crate::ui::view::SettingsRenderCommand;
 use crate::ui::view::TimerRenderCommand;
+use crate::utils;
 
 struct TuiTimerRenderer;
 
@@ -94,15 +94,15 @@ impl TuiTimerRenderer {
             PomodoroState::ShortBreak => ("SHORT BREAK", Color::LightGreen),
             PomodoroState::LongBreak => ("LONG BREAK", Color::LightCyan),
         };
-        let label = Self::ascii_future(label);
+        let label = utils::ascii_future(label);
         let center = Alignment::Center;
 
         if paused {
-            let paused_label = Self::ascii_future(" ( PAUSED )");
+            let paused_label = utils::ascii_future(" ( PAUSED )");
 
             let [area_label, area_paused] = Layout::horizontal([
-                Constraint::Length(Self::string_width(&label) as u16),
-                Constraint::Length(Self::string_width(&paused_label) as u16),
+                Constraint::Length(utils::string_width(&label) as u16),
+                Constraint::Length(utils::string_width(&paused_label) as u16),
             ])
             .flex(Flex::Center)
             .areas::<2>(area);
@@ -128,10 +128,10 @@ impl TuiTimerRenderer {
 
     fn timer(&self, frame: &mut Frame, area: Rect, remaining: &Duration, color: Color) {
         let time_str = format_duration_clock(remaining);
-        let ascii = Self::ascii_mono12(time_str);
+        let ascii = utils::ascii_mono12(time_str);
 
-        let width = Self::string_width(&ascii) as u16;
-        let height = Self::string_height(&ascii) as u16;
+        let width = utils::string_width(&ascii) as u16;
+        let height = utils::string_height(&ascii) as u16;
         let area = area.centered(Constraint::Length(width), Constraint::Length(height));
 
         let p = Paragraph::new(ascii)
@@ -199,33 +199,6 @@ impl TuiTimerRenderer {
         frame.render_widget(p, area);
     }
 
-    fn string_width(text: impl AsRef<str>) -> usize {
-        text.as_ref()
-            .lines()
-            .map(|l| l.chars().count())
-            .max()
-            .unwrap_or(0)
-    }
-
-    fn string_height(text: impl AsRef<str>) -> usize {
-        text.as_ref().lines().count()
-    }
-
-    fn ascii_mono12(text: impl AsRef<str>) -> String {
-        Toilet::mono12()
-            .unwrap()
-            .convert(text.as_ref())
-            .unwrap()
-            .to_string()
-    }
-
-    fn ascii_future(text: impl AsRef<str>) -> String {
-        Toilet::future()
-            .unwrap()
-            .convert(text.as_ref())
-            .unwrap()
-            .to_string()
-    }
 }
 
 struct TuiSettingsRenderer;
