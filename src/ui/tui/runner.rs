@@ -1,6 +1,5 @@
 use std::thread::sleep;
 use std::time::Duration;
-use std::time::Instant;
 
 use crossterm::event::Event;
 use crossterm::event::KeyCode;
@@ -20,7 +19,6 @@ use crate::ui::Input;
 use crate::ui::Navigation;
 use crate::ui::app::App;
 use crate::ui::app::AppBuildError;
-use crate::ui::error::UiError;
 use crate::ui::tui::TuiError;
 use crate::ui::tui::renderer::TuiRenderer;
 use crate::ui::tui::view::TuiSettingsView;
@@ -42,7 +40,7 @@ impl TuiRunner {
         Ok(Self { app })
     }
 
-    pub fn run(&mut self) -> Result<(), UiError> {
+    pub fn run(&mut self) -> Result<(), TuiError> {
         enable_raw_mode().map_err(TuiError::from)?;
         let mut stdout = std::io::stdout();
         execute!(stdout, EnterAlternateScreen).map_err(TuiError::from)?;
