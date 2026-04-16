@@ -7,6 +7,7 @@ use crate::ui::Navigation;
 use crate::ui::Page;
 use crate::ui::view::SettingsRenderCommand;
 use crate::ui::view::SettingsView;
+use crate::ui::view::SettingsViewActions;
 use crate::ui::view::SettingsViewState;
 use crate::ui::view::TimerRenderCommand;
 use crate::ui::view::TimerView;
@@ -76,9 +77,40 @@ impl SettingsController {
         Self { view, config }
     }
 
+    pub fn handle(&mut self, action: SettingsViewActions) -> Result<Navigation, PomodoroError> {
+        use SettingsViewActions::*;
+        let timer = &mut self.config.pomodoro.timer;
+        let hook = &mut self.config.pomodoro.hook;
+        let sound = &mut self.config.pomodoro.sound;
+        match action {
+            TimerFocus(duration) => timer.focus = duration,
+            TimerShort(duration) => timer.short = duration,
+            TimerLong(duration) => timer.long = duration,
+            TimerLongInterval(interval) => timer.long_interval = interval,
+            TimerAutoFocus(auto) => timer.auto_focus = auto,
+            TimerAutoShort(auto) => timer.auto_short = auto,
+            TimerAutoLong(auto) => timer.auto_long = auto,
+
+            HookFocus(cmd) => hook.focus = Self::split_cmd(cmd),
+            HookShort(cmd) => hook.short = Self::split_cmd(cmd),
+            HookLong(cmd) => hook.long = Self::split_cmd(cmd),
+
+            SoundFocus(path) => sound.focus = path,
+            SoundShort(path) => sound.short = path,
+            SoundLong(path) => sound.long = path,
+
+            GoTo(page) => return Ok(Navigation::GoTo(page)),
+        }
+        Ok(Navigation::Stay)
+    }
+
     pub fn render(&self) -> Vec<SettingsRenderCommand> {
         let state = SettingsViewState::from(&self.config);
         self.view.render(state)
+    }
+
+    fn split_cmd(cmd: String) -> Vec<String> {
+        cmd.split_whitespace().map(str::to_owned).collect::<Vec<String>>()
     }
 }
 

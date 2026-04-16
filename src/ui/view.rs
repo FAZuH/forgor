@@ -1,8 +1,10 @@
+use std::path::PathBuf;
 use std::time::Duration;
 
 use crate::models::pomodoro::PomodoroState;
 use crate::ui::FromInput;
 use crate::ui::Input;
+use crate::ui::Page;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum RenderCommand {
@@ -87,10 +89,40 @@ pub trait SettingsView {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SettingsViewState {
-    pub focus: Duration,
-    pub short: Duration,
-    pub long: Duration,
-    pub long_interval: u32,
+    pub timer_focus: Duration,
+    pub timer_short: Duration,
+    pub timer_long: Duration,
+    pub timer_long_interval: u32,
+    pub timer_auto_focus: bool,
+    pub timer_auto_short: bool,
+    pub timer_auto_long: bool,
+    pub hook_focus: String,
+    pub hook_short: String,
+    pub hook_long: String,
+    pub sound_focus: Option<PathBuf>,
+    pub sound_short: Option<PathBuf>,
+    pub sound_long: Option<PathBuf>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SettingsViewActions {
+    TimerFocus(Duration),
+    TimerShort(Duration),
+    TimerLong(Duration),
+    TimerLongInterval(u32),
+    TimerAutoFocus(bool),
+    TimerAutoShort(bool),
+    TimerAutoLong(bool),
+
+    HookFocus(String),
+    HookShort(String),
+    HookLong(String),
+
+    SoundFocus(Option<PathBuf>),
+    SoundShort(Option<PathBuf>),
+    SoundLong(Option<PathBuf>),
+
+    GoTo(Page),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
