@@ -4,7 +4,6 @@ use crate::config::Config;
 use crate::models::Pomodoro;
 use crate::models::pomodoro::PomodoroError;
 use crate::ui::Navigation;
-use crate::ui::Page;
 use crate::ui::view::SettingsRenderCommand;
 use crate::ui::view::SettingsView;
 use crate::ui::view::SettingsViewActions;
@@ -34,8 +33,7 @@ impl TimerController {
             TogglePause => self.model.toggle_pause(),
             SkipSession => self.model.skip(),
             ResetSession => self.model.reset(),
-            GoSettings => return Ok(Navigation::GoTo(Page::Settings)),
-            Quit => return Ok(Navigation::Quit),
+            Navigate(nav) => return Ok(nav),
         }
         Ok(Navigation::Stay)
     }

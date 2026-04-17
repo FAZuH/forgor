@@ -44,8 +44,7 @@ pub enum TimerViewActions {
     SkipSession,
     ResetSession,
 
-    GoSettings,
-    Quit,
+    Navigate(Navigation),
 }
 
 impl FromInput for TimerViewActions {
@@ -60,7 +59,8 @@ impl FromInput for TimerViewActions {
             Char(' ') => TogglePause,
             Enter => SkipSession,
             Backspace => ResetSession,
-            Char('q') => Quit,
+            Char('q') => Navigate(Navigation::Quit),
+            Char('s') => Navigate(Navigation::GoTo(Page::Settings)),
             _ => return None,
         };
         Some(ret)
