@@ -28,6 +28,9 @@ jobs:
       - name: Set Up version.json
         run: echo "{\"version\":\"$(git describe --tags --abbrev=0 2>/dev/null || echo '0.0.0')\"}" > version.json
 
+      - name: Install changelog dependencies
+        run: npm install conventional-changelog-conventionalcommits@7.0.2
+
       - name: Create Changelog
         id: changelog
         uses: TriPSs/conventional-changelog-action@v5.2.1
