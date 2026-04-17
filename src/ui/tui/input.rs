@@ -52,10 +52,10 @@ impl InputMapper<Input, TimerActions> for TimerInputMapper {
         use Input::*;
         use TimerActions::*;
         let ret = match input {
-            Left => Subtract(Duration::from_secs(30)),
-            Down => Subtract(Duration::from_secs(60)),
-            Right => Add(Duration::from_secs(30)),
-            Up => Add(Duration::from_secs(60)),
+            Left | Char('h') => Subtract(Duration::from_secs(30)),
+            Down | Char('j') => Subtract(Duration::from_secs(60)),
+            Right | Char('l') => Add(Duration::from_secs(30)),
+            Up | Char('k') => Add(Duration::from_secs(60)),
             Char(' ') => TogglePause,
             Enter => SkipSession,
             Backspace => ResetSession,
