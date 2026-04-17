@@ -31,15 +31,8 @@ pub struct TimerViewState {
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
 pub enum TimerViewActions {
-    // forward
-    Add30Sec,
-    Add1Min,
-
-    // backward
-    Sub30Sec,
-    Sub1Min,
-
-    // session
+    Add(Duration),
+    Subtract(Duration),
     TogglePause,
     SkipSession,
     ResetSession,
@@ -52,10 +45,10 @@ impl FromInput for TimerViewActions {
         use Input::*;
         use TimerViewActions::*;
         let ret = match input {
-            Left => Sub30Sec,
-            Down => Sub1Min,
-            Right => Add30Sec,
-            Up => Add1Min,
+            Left => Subtract(Duration::from_secs(30)),
+            Down => Subtract(Duration::from_secs(60)),
+            Right => Add(Duration::from_secs(30)),
+            Up => Add(Duration::from_secs(60)),
             Char(' ') => TogglePause,
             Enter => SkipSession,
             Backspace => ResetSession,
