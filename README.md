@@ -26,13 +26,24 @@
 Download the latest binary for your platform from the [GitHub Releases](https://github.com/FAZuH/tomo/releases).
 
 ```sh
-# Download and extract (example for Linux)
-curl -LO https://github.com/FAZuH/tomo/releases/latest/download/tomo-linux-x64.tar.gz
-tar -xzf tomo-linux-x64.tar.gz
+# Linux (x64)
+curl -LO https://github.com/FAZuH/tomo/releases/latest/download/tomo-linux-x64
+chmod +x tomo-linux-x64
+sudo mv tomo-linux-x64 /usr/local/bin/tomo
 
-# Make executable and move to PATH
-chmod +x tomo
-sudo mv tomo /usr/local/bin/
+# macOS Intel (x64)
+curl -LO https://github.com/FAZuH/tomo/releases/latest/download/tomo-macos-x64
+chmod +x tomo-macos-x64
+sudo mv tomo-macos-x64 /usr/local/bin/tomo
+
+# macOS Apple Silicon (ARM64)
+curl -LO https://github.com/FAZuH/tomo/releases/latest/download/tomo-macos-arm64
+chmod +x tomo-macos-arm64
+sudo mv tomo-macos-arm64 /usr/local/bin/tomo
+
+# Windows (x64 - PowerShell)
+# Download tomo-windows-x64.exe from the releases page
+# Add it to your PATH or run directly
 ```
 
 ### Build from Source (Cargo)
