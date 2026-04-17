@@ -1,17 +1,15 @@
 use crate::config::Config;
 use crate::models::Pomodoro;
 use crate::models::pomodoro::PomodoroError;
-use crate::ui::FromInput;
-use crate::ui::Input;
 use crate::ui::Navigation;
 use crate::ui::Page;
 use crate::ui::controller::SettingsController;
 use crate::ui::controller::TimerController;
 use crate::ui::view::RenderCommand;
+use crate::ui::view::SettingsActions;
 use crate::ui::view::SettingsView;
-use crate::ui::view::SettingsViewActions;
+use crate::ui::view::TimerActions;
 use crate::ui::view::TimerView;
-use crate::ui::view::TimerViewActions;
 
 pub struct App {
     active_page: Page,
@@ -24,23 +22,22 @@ impl App {
         AppBuilder::default()
     }
 
-    pub fn handle(&mut self, input: Input) -> Result<Navigation, AppError> {
-        match self.active_page {
-            Page::Timer => match TimerViewActions::from_input(input) {
-                Some(action) => Ok(self.timer.handle(action)?),
-                None => Ok(Navigation::Stay),
-            },
-            Page::Settings => match SettingsViewActions::from_input(input) {
-                Some(action) => Ok(self.settings.handle(action)?),
-                None => Ok(Navigation::Stay),
-            },
-        }
+    pub fn handle_settings(&mut self, action: SettingsActions) -> Result<Navigation, AppError> {
+        Ok(self.settings.handle(action)?)
+    }
+
+    pub fn handle_timer(&mut self, action: TimerActions) -> Result<Navigation, AppError> {
+        Ok(self.timer.handle(action)?)
     }
 
     pub fn navigate(&mut self, nav: Navigation) {
         if let Navigation::GoTo(page) = nav {
             self.active_page = page;
         }
+    }
+
+    pub fn active_page(&self) -> Page {
+        self.active_page
     }
 
     pub fn tick(&mut self) -> Result<(), AppError> {
@@ -69,16 +66,16 @@ pub struct AppBuilder {
 
 impl AppBuilder {
     pub fn build(self) -> Result<App, AppBuildError> {
+        use AppBuildError::*;
         Ok(App {
             active_page: self.page.unwrap_or(Page::Timer),
             timer: TimerController::new(
-                self.timer_view.ok_or(AppBuildError::MissingTimerView)?,
-                self.pomodoro.ok_or(AppBuildError::MissingPomodoro)?,
+                self.timer_view.ok_or(MissingTimerView)?,
+                self.pomodoro.ok_or(MissingPomodoro)?,
             ),
             settings: SettingsController::new(
-                self.settings_view
-                    .ok_or(AppBuildError::MissingSettingsView)?,
-                self.config.ok_or(AppBuildError::MissingConfig)?,
+                self.settings_view.ok_or(MissingSettingsView)?,
+                self.config.ok_or(MissingConfig)?,
             ),
         })
     }
@@ -115,6 +112,7 @@ pub enum AppBuildError {
     MissingConfig,
     #[error("missing pomodoro")]
     MissingPomodoro,
+
     #[error("missing timer_view")]
     MissingTimerView,
     #[error("missing settings_view")]

@@ -16,26 +16,26 @@ impl TuiTimerView {
 impl TimerView for TuiTimerView {
     fn render(&self, s: TimerViewState) -> Vec<TimerRenderCommand> {
         use TimerRenderCommand::*;
-        let mut ret = Vec::new();
 
-        ret.push(State(s.state));
-        ret.push(Timer {
-            remaining: s.remaining,
-        });
-        ret.push(PauseIndicator(!s.running));
-        ret.push(Stats {
-            remaining: s.remaining,
-            total: s.total,
-            long_interval: s.long_interval,
-            total_sessions: s.total_sessions,
-            focus_sessions: s.focus_sessions,
-        });
-        ret.push(Progress(s.progress_perc));
-
-        ret
+        vec![
+            State(s.state),
+            Timer {
+                remaining: s.remaining,
+            },
+            PauseIndicator(!s.running),
+            Stats {
+                remaining: s.remaining,
+                total: s.total,
+                long_interval: s.long_interval,
+                total_sessions: s.total_sessions,
+                focus_sessions: s.focus_sessions,
+            },
+            Progress(s.progress_perc),
+        ]
     }
 }
 
+#[derive(Default)]
 pub struct TuiSettingsView;
 
 impl TuiSettingsView {
@@ -65,14 +65,14 @@ impl SettingsView for TuiSettingsView {
                 ]),
             ]),
             S::section("󰛢 Command Hooks", vec![
-                S::input("Focus Hook", state.hook_focus),
-                S::input("Short Break Hook", state.hook_short),
-                S::input("Long Break Hook", state.hook_long),
+                S::input("Focus Hook", &state.hook_focus),
+                S::input("Short Break Hook", &state.hook_short),
+                S::input("Long Break Hook", &state.hook_long),
             ]),
             S::section("󰕾 Sounds", vec![
-                S::input("Focus Sound", state.sound_focus.map(|p| p.display().to_string()).unwrap_or_default()),
-                S::input("Short Break Sound", state.sound_short.map(|p| p.display().to_string()).unwrap_or_default()),
-                S::input("Long Break Sound", state.sound_long.map(|p| p.display().to_string()).unwrap_or_default()),
+                S::input("Focus Sound", state.sound_focus.as_ref().map(|p| p.display().to_string()).unwrap_or_default()),
+                S::input("Short Break Sound", state.sound_short.as_ref().map(|p| p.display().to_string()).unwrap_or_default()),
+                S::input("Long Break Sound", state.sound_long.as_ref().map(|p| p.display().to_string()).unwrap_or_default()),
             ]),
         ]
     }

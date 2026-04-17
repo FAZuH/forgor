@@ -1,17 +1,14 @@
-use std::time::Duration;
-
 use crate::config::Config;
 use crate::models::Pomodoro;
 use crate::models::pomodoro::PomodoroError;
 use crate::ui::Navigation;
-use crate::ui::Page;
+use crate::ui::view::SettingsActions;
 use crate::ui::view::SettingsRenderCommand;
 use crate::ui::view::SettingsView;
-use crate::ui::view::SettingsViewActions;
 use crate::ui::view::SettingsViewState;
+use crate::ui::view::TimerActions;
 use crate::ui::view::TimerRenderCommand;
 use crate::ui::view::TimerView;
-use crate::ui::view::TimerViewActions;
 use crate::ui::view::TimerViewState;
 
 pub struct TimerController {
@@ -24,18 +21,15 @@ impl TimerController {
         Self { view, model }
     }
 
-    pub fn handle(&mut self, action: TimerViewActions) -> Result<Navigation, PomodoroError> {
-        use TimerViewActions::*;
+    pub fn handle(&mut self, action: TimerActions) -> Result<Navigation, PomodoroError> {
+        use TimerActions::*;
         match action {
-            Add30Sec => self.model.add(Duration::from_secs(30)),
-            Add1Min => self.model.add(Duration::from_mins(1)),
-            Sub30Sec => self.model.subtract(Duration::from_secs(30)),
-            Sub1Min => self.model.subtract(Duration::from_mins(1)),
+            Add(dur) => self.model.add(dur),
+            Subtract(dur) => self.model.subtract(dur),
             TogglePause => self.model.toggle_pause(),
             SkipSession => self.model.skip(),
             ResetSession => self.model.reset(),
-            GoSettings => return Ok(Navigation::GoTo(Page::Settings)),
-            Quit => return Ok(Navigation::Quit),
+            Navigate(nav) => return Ok(nav),
         }
         Ok(Navigation::Stay)
     }
@@ -70,41 +64,45 @@ impl From<&Pomodoro> for TimerViewState {
 pub struct SettingsController {
     view: Box<dyn SettingsView>,
     config: Config,
-    curr_selection_idx: u32,
 }
 
 impl SettingsController {
     pub fn new(view: Box<dyn SettingsView>, config: Config) -> Self {
-        Self {
-            view,
-            config,
-            curr_selection_idx: 0,
-        }
+        Self { view, config }
     }
 
-    pub fn handle(&mut self, action: SettingsViewActions) -> Result<Navigation, PomodoroError> {
-        use SettingsViewActions::*;
+    pub fn handle(&mut self, action: SettingsActions) -> Result<Navigation, PomodoroError> {
+        use SettingsActions::*;
+        let timer = &mut self.config.pomodoro.timer;
+        let hook = &mut self.config.pomodoro.hook;
+        let sound = &mut self.config.pomodoro.sound;
         match action {
-            SelectDown => self.curr_selection_idx += 1,
-            SelectUp => self.curr_selection_idx -= 1,
-            EditSelection => todo!(),
+            // Timer settings
+            TimerFocus(d) => timer.focus = d,
+            TimerShort(d) => timer.short = d,
+            TimerLong(d) => timer.long = d,
+            TimerLongInterval(n) => timer.long_interval = n,
+            TimerAutoFocus => timer.auto_focus = !timer.auto_focus,
+            TimerAutoShort => timer.auto_short = !timer.auto_short,
+            TimerAutoLong => timer.auto_long = !timer.auto_long,
+            // Hook settings
+            HookFocus(s) => hook.focus = s,
+            HookShort(s) => hook.short = s,
+            HookLong(s) => hook.long = s,
+            // Sound settings
+            SoundFocus(p) => sound.focus = p,
+            SoundShort(p) => sound.short = p,
+            SoundLong(p) => sound.long = p,
             Navigate(nav) => return Ok(nav),
         }
         Ok(Navigation::Stay)
     }
 
     pub fn render(&self) -> Vec<SettingsRenderCommand> {
-        let state = SettingsViewState::from(&self.config);
-        self.view.render(state)
-    }
-}
-
-impl From<&Config> for SettingsViewState {
-    fn from(value: &Config) -> Self {
-        let timer = value.pomodoro.timer.clone();
-        let hook = value.pomodoro.hook.clone();
-        let sound = value.pomodoro.sound.clone();
-        Self {
+        let timer = self.config.pomodoro.timer.clone();
+        let hook = self.config.pomodoro.hook.clone();
+        let sound = self.config.pomodoro.sound.clone();
+        let state = SettingsViewState {
             timer_focus: timer.focus,
             timer_short: timer.short,
             timer_long: timer.long,
@@ -118,6 +116,7 @@ impl From<&Config> for SettingsViewState {
             sound_focus: sound.focus,
             sound_short: sound.short,
             sound_long: sound.long,
-        }
+        };
+        self.view.render(state)
     }
 }

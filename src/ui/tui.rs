@@ -1,3 +1,4 @@
+pub mod input;
 pub mod renderer;
 pub mod runner;
 pub mod view;
@@ -13,4 +14,7 @@ pub enum TuiError {
 
     #[error(transparent)]
     App(#[from] AppError),
+
+    #[error("Error during initialization: {0}")]
+    InitializeError(String),
 }

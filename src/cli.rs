@@ -6,16 +6,16 @@ use clap::Parser;
 #[derive(Parser, Debug, Clone)]
 #[command(name = crate::APP_NAME, version, about)]
 pub struct Cli {
-    #[arg(short, long, default_value = "25m", value_parser = atodur)]
+    #[arg(short, long, value_parser = atodur)]
     pub focus: Option<Duration>,
 
-    #[arg(short, long, default_value = "5m", value_parser = atodur)]
+    #[arg(short, long, value_parser = atodur)]
     pub short_break: Option<Duration>,
 
-    #[arg(short, long, default_value = "15m", value_parser = atodur)]
+    #[arg(short, long, value_parser = atodur)]
     pub long_break: Option<Duration>,
 
-    #[arg(short = 'L', long, default_value = "3", value_parser = |a: &str| a.parse::<u32>())]
+    #[arg(short = 'L', long, value_parser = |a: &str| a.parse::<u32>())]
     pub long_interval: Option<u32>,
 }
 
@@ -40,8 +40,8 @@ fn atodur(arg: &str) -> Result<Duration, CliArgumentError> {
     let secs = if let Some(suffix) = suffix {
         let time = &arg[..arg.len() - 1];
         match suffix {
-            'h' => time.parse::<f32>()? * 3600 as f32,
-            'm' => time.parse::<f32>()? * 60 as f32,
+            'h' => time.parse::<f32>()? * 3600_f32,
+            'm' => time.parse::<f32>()? * 60_f32,
             's' => time.parse::<f32>()?,
             _ => arg.parse::<f32>()?,
         }
