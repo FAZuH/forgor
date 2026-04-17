@@ -14,4 +14,7 @@ pub enum TuiError {
 
     #[error(transparent)]
     App(#[from] AppError),
+
+    #[error("Error during initialization: {0}")]
+    InitializeError(String),
 }

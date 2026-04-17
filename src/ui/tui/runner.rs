@@ -1,5 +1,6 @@
 use std::thread::sleep;
 use std::time::Duration;
+use std::time::Instant;
 
 use crossterm::event::Event;
 use crossterm::event::{self};
@@ -16,150 +17,149 @@ use crate::ui::Input;
 use crate::ui::Navigation;
 use crate::ui::Page;
 use crate::ui::app::App;
-use crate::ui::app::AppBuildError;
 use crate::ui::tui::TuiError;
 use crate::ui::tui::input::InputMapper;
 use crate::ui::tui::input::TimerInputMapper;
 use crate::ui::tui::input::commit_settings_edit;
 use crate::ui::tui::renderer::TuiRenderer;
-use crate::ui::tui::renderer::TuiSettingsRenderer;
 use crate::ui::tui::view::TuiSettingsView;
 use crate::ui::tui::view::TuiTimerView;
 
 pub struct TuiRunner {
     app: App,
+    should_quit: bool,
+    renderer: TuiRenderer,
+    terminal: Terminal<CrosstermBackend<std::io::Stdout>>,
 }
 
 impl TuiRunner {
-    pub fn new(config: Config, pomodoro: Pomodoro) -> Result<Self, AppBuildError> {
+    pub fn new(config: Config, pomodoro: Pomodoro) -> Result<Self, TuiError> {
         let app = App::builder()
             .pomodoro(pomodoro)
             .config(config)
             .timer_view(Box::new(TuiTimerView::new()))
             .settings_view(Box::new(TuiSettingsView::new()))
-            .build()?;
+            .build()
+            .map_err(|e| TuiError::InitializeError(e.to_string()))?;
 
-        Ok(Self { app })
+        let renderer = TuiRenderer::new();
+        let terminal = Terminal::new(CrosstermBackend::new(std::io::stdout()))?;
+
+        Ok(Self {
+            app,
+            should_quit: false,
+            renderer,
+            terminal,
+        })
     }
 
     pub fn run(&mut self) -> Result<(), TuiError> {
         enable_raw_mode().map_err(TuiError::from)?;
-        let mut stdout = std::io::stdout();
-        execute!(stdout, EnterAlternateScreen).map_err(TuiError::from)?;
-        let mut terminal = Terminal::new(CrosstermBackend::new(stdout)).map_err(TuiError::from)?;
+        execute!(std::io::stdout(), EnterAlternateScreen).map_err(TuiError::from)?;
 
-        let mut renderer = TuiRenderer::new();
+        let res = self.run_loop();
 
-        let res = self.run_loop(&mut terminal, &mut renderer);
-
-        // Unconditionally ignore errors for cleanup
-        let _ = disable_raw_mode();
-        let _ = execute!(terminal.backend_mut(), LeaveAlternateScreen);
-        let _ = terminal.show_cursor();
-
+        self.cleanup();
         res
     }
 
-    fn run_loop(
-        &mut self,
-        terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
-        renderer: &mut TuiRenderer,
-    ) -> Result<(), TuiError> {
-        loop {
-            self.app.tick()?;
+    fn cleanup(&mut self) {
+        // Unconditionally ignore errors for cleanup
+        let _ = disable_raw_mode();
+        let _ = execute!(self.terminal.backend_mut(), LeaveAlternateScreen);
+        let _ = self.terminal.show_cursor();
+    }
 
-            let cmds = self.app.render();
-            terminal
-                .draw(|f| renderer.flush(f, cmds))
-                .map_err(TuiError::from)?;
+    fn run_loop(&mut self) -> Result<(), TuiError> {
+        let mut last_tick = Instant::now();
+        let tick_rate = Duration::from_millis(100);
 
-            if event::poll(Duration::from_millis(100)).map_err(TuiError::from)?
-                && let Event::Key(key) = event::read().map_err(TuiError::from)?
-                && let Some(input) = Input::from_keyevent(key)
-            {
-                // Handle settings input directly on the renderer
-                if matches!(self.app.active_page(), Page::Settings) {
-                    self.handle_settings_input(input, renderer)?;
-                } else if let Some(action) = TimerInputMapper::new().into_action(input) {
-                    let nav = self.app.handle_timer(action)?;
-                    if matches!(nav, Navigation::Quit) {
-                        break;
-                    }
-                    self.app.navigate(nav);
-                }
+        while !self.should_quit {
+            let now = Instant::now();
+            if now.duration_since(last_tick) >= tick_rate {
+                self.app.tick()?;
+                last_tick = now
+            }
+
+            self.render_terminal()?;
+
+            if let Some(input) = Self::get_input()? {
+                self.handle_key_event(input)?
             }
             sleep(Duration::from_millis(100));
         }
         Ok(())
     }
 
-    /// Handle settings page input directly, mutating renderer state
-    fn handle_settings_input(
-        &mut self,
-        input: Input,
-        renderer: &mut TuiRenderer,
-    ) -> Result<(), TuiError> {
-        use Input::*;
+    fn get_input() -> Result<Option<Input>, TuiError> {
+        if event::poll(Duration::from_millis(10))?
+            && let Event::Key(key) = event::read()?
+        {
+            Ok(Input::from_keyevent(key))
+        } else {
+            Ok(None)
+        }
+    }
 
-        let settings = &mut renderer.settings;
+    fn render_terminal(&mut self) -> Result<(), TuiError> {
+        let cmds = self.app.render();
+        self.terminal.draw(|f| self.renderer.flush(f, cmds))?;
+        Ok(())
+    }
+
+    fn handle_key_event(&mut self, input: Input) -> Result<(), TuiError> {
+        // Handle settings input directly on the renderer
+        match self.app.active_page() {
+            Page::Settings => self.handle_settings(input)?,
+            Page::Timer => self.handle_timer(input)?,
+        }
+        Ok(())
+    }
+
+    fn handle_timer(&mut self, input: Input) -> Result<(), TuiError> {
+        if let Some(action) = TimerInputMapper::new().into_action(input) {
+            let nav = self.app.handle_timer(action)?;
+            self.handle_nav(nav);
+        }
+        Ok(())
+    }
+
+    /// Handle settings page input directly, mutating renderer state
+    fn handle_settings(&mut self, input: Input) -> Result<(), TuiError> {
+        let settings = &mut self.renderer.settings;
 
         // When editing, handle text input
         if settings.is_editing() {
-            return self.handle_settings_edit_input(input, settings);
+            return self.handle_settings_edit(input);
         }
 
         // When navigating, handle navigation input
+        use Input::*;
         match input {
-            Up | Char('k') => {
-                settings.select_up();
-            }
-            Down | Char('j') => {
-                settings.select_down();
-            }
-            Enter => {
-                settings.start_editing();
-            }
-            Esc => {
-                self.app.navigate(Navigation::GoTo(Page::Timer));
-            }
-            Char('q') => {
-                return Err(TuiError::from(std::io::Error::new(
-                    std::io::ErrorKind::Interrupted,
-                    "quit",
-                )));
-            }
+            Up | Char('k') => settings.select_up(),
+            Down | Char('j') => settings.select_down(),
+            Enter => settings.start_editing(),
+            Esc => self.app.navigate(Navigation::GoTo(Page::Timer)),
+            Char('q') => self.quit(),
             _ => {}
         }
 
         Ok(())
     }
 
-    fn handle_settings_edit_input(
-        &mut self,
-        input: Input,
-        settings: &mut TuiSettingsRenderer,
-    ) -> Result<(), TuiError> {
-        use Input::*;
+    fn handle_settings_edit(&mut self, input: Input) -> Result<(), TuiError> {
+        let settings = &mut self.renderer.settings;
 
+        use Input::*;
         match input {
-            Esc => {
-                settings.cancel_editing();
-            }
+            Esc => settings.cancel_editing(),
             Enter => {
                 if let Some(action) = commit_settings_edit(settings) {
                     let nav = self.app.handle_settings(action)?;
-                    if matches!(nav, Navigation::Quit) {
-                        return Err(TuiError::from(std::io::Error::new(
-                            std::io::ErrorKind::Interrupted,
-                            "quit",
-                        )));
-                    }
-                    self.app.navigate(nav);
+                    self.handle_nav(nav)
                 }
             }
-            Backspace => {
-                settings.pop_char();
-            }
+            Backspace => settings.pop_char(),
             Char(c) if c.is_ascii_digit() || c == ':' => {
                 settings.push_char(c);
             }
@@ -167,6 +167,18 @@ impl TuiRunner {
         }
 
         Ok(())
+    }
+
+    fn handle_nav(&mut self, nav: Navigation) {
+        if matches!(nav, Navigation::Quit) {
+            self.quit();
+        } else {
+            self.app.navigate(nav);
+        }
+    }
+
+    fn quit(&mut self) {
+        self.should_quit = true
     }
 }
 

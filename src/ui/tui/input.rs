@@ -67,17 +67,6 @@ impl InputMapper<Input, TimerActions> for TimerInputMapper {
     }
 }
 
-/// Platform-specific input mapper for settings (stateless, just maps to domain actions)
-pub struct SettingsInputMapper;
-
-impl InputMapper<Input, SettingsActions> for SettingsInputMapper {
-    fn into_action(&mut self, _input: Input) -> Option<SettingsActions> {
-        // Settings input is handled directly in TuiRunner
-        // This mapper is only used for actions that bypass navigation (e.g., direct quit)
-        None
-    }
-}
-
 /// Commit the current edit from the settings renderer state to a domain action
 pub fn commit_settings_edit(settings: &mut TuiSettingsRenderer) -> Option<SettingsActions> {
     use SettingsActions::*;
