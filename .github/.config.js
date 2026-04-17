@@ -10,50 +10,52 @@ const config = require("conventional-changelog-conventionalcommits");
 function whatBump(commits) {
   const hasMajor = commits.some(c => c?.header?.startsWith("chore!(major)"));
   const hasMinor = commits.some(c => c?.header?.startsWith("chore!(minor)"));
-  
+
   if (hasMajor) {
     return {
       releaseType: "major",
       reason: "Found a commit with a chore!(major) type."
     };
   }
-  
+
   if (hasMinor) {
     return {
       releaseType: "minor",
       reason: "Found a commit with a chore!(minor) type."
     };
   }
-  
+
   return {
     releaseType: "patch",
     reason: "No special commits found. Defaulting to a patch."
   };
 }
 
+// Check if commit should appear in changelog (has [public] marker)
+function isPublicCommit(commit) {
+  const publicMarker = /\[public\]/i;
+  const header = commit.header || "";
+  const body = commit.body || "";
+  const subject = commit.subject || "";
+
+  return publicMarker.test(header) || publicMarker.test(body) || publicMarker.test(subject);
+}
+
 async function getOptions() {
   let options = await config({
     types: [
-      { type: "u_feat", section: "New Features" },
-      { type: "u_fix", section: "Bug Fixes" },
-      { type: "u_perf", section: "Performance Improvements" },
-      { type: "u_ui", section: "UI/UX Changes" },
-      { type: "u_docs", section: "Documentation" },
-      { type: "u_revert", section: "Reverts" },
+      { type: "feat", section: "New Features" },
+      { type: "fix", section: "Bug Fixes" },
+      { type: "perf", section: "Performance Improvements" },
+      { type: "docs", section: "Documentation" },
+      { type: "revert", section: "Reverts" },
 
-      { type: "feat", section: "New Features (internal)", hidden: true },
-      { type: "fix", section: "Bug Fixes (internal)", hidden: true },
-      { type: "perf", section: "Performance Improvements (internal)", hidden: true },
-      { type: "ui", section: "UI/UX Changes (internal)", hidden: true },
-      { type: "docs", section: "Documentation (internal)", hidden: true },
-      { type: "revert", section: "Reverts (internal)", hidden: true },
-
-      { type: "style", section: "Styles", hidden: true },
-      { type: "chore", section: "Miscellaneous Chores", hidden: true },
-      { type: "refactor", section: "Code Refactoring", hidden: true },
-      { type: "test", section: "Tests", hidden: true },
-      { type: "build", section: "Build System", hidden: true },
-      { type: "ci", section: "Continuous Integration", hidden: true },
+      { type: "style", section: "Styles" },
+      { type: "chore", section: "Miscellaneous Chores" },
+      { type: "refactor", section: "Code Refactoring" },
+      { type: "test", section: "Tests" },
+      { type: "build", section: "Build System" },
+      { type: "ci", section: "Continuous Integration" },
     ],
   });
 
@@ -64,13 +66,22 @@ async function getOptions() {
   if (options.writerOpts && options.writerOpts.transform) {
     const originalTransform = options.writerOpts.transform;
     options.writerOpts.transform = (commit, context) => {
-      const skipCiRegex = / \[skip ci\]/g;
+      // Filter out non-public commits (return null to exclude)
+      if (!isPublicCommit(commit)) {
+        return null;
+      }
+
+      // Remove [public] marker and [skip ci] from display
+      const publicMarker = /\s*\[public\]/gi;
+      const skipCiRegex = /\s*\[skip ci\]/gi;
+
       if (commit.header) {
-        commit.header = commit.header.replace(skipCiRegex, "");
+        commit.header = commit.header.replace(publicMarker, "").replace(skipCiRegex, "").trim();
       }
       if (commit.subject) {
-        commit.subject = commit.subject.replace(skipCiRegex, "");
+        commit.subject = commit.subject.replace(publicMarker, "").replace(skipCiRegex, "").trim();
       }
+
       return originalTransform(commit, context);
     };
   }
