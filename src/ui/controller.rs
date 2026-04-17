@@ -1,15 +1,15 @@
 use crate::config::Config;
-use crate::models::pomodoro::PomodoroError;
 use crate::models::Pomodoro;
+use crate::models::pomodoro::PomodoroError;
+use crate::ui::Navigation;
+use crate::ui::view::SettingsActions;
 use crate::ui::view::SettingsRenderCommand;
 use crate::ui::view::SettingsView;
-use crate::ui::view::SettingsViewActions;
 use crate::ui::view::SettingsViewState;
+use crate::ui::view::TimerActions;
 use crate::ui::view::TimerRenderCommand;
 use crate::ui::view::TimerView;
-use crate::ui::view::TimerViewActions;
 use crate::ui::view::TimerViewState;
-use crate::ui::Navigation;
 
 pub struct TimerController {
     view: Box<dyn TimerView>,
@@ -21,8 +21,8 @@ impl TimerController {
         Self { view, model }
     }
 
-    pub fn handle(&mut self, action: TimerViewActions) -> Result<Navigation, PomodoroError> {
-        use TimerViewActions::*;
+    pub fn handle(&mut self, action: TimerActions) -> Result<Navigation, PomodoroError> {
+        use TimerActions::*;
         match action {
             Add(dur) => self.model.add(dur),
             Subtract(dur) => self.model.subtract(dur),
@@ -71,8 +71,8 @@ impl SettingsController {
         Self { view, config }
     }
 
-    pub fn handle(&mut self, action: SettingsViewActions) -> Result<Navigation, PomodoroError> {
-        use SettingsViewActions::*;
+    pub fn handle(&mut self, action: SettingsActions) -> Result<Navigation, PomodoroError> {
+        use SettingsActions::*;
         match action {
             // Timer settings
             TimerFocus(d) => self.config.pomodoro.timer.focus = d,

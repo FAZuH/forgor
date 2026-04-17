@@ -20,16 +20,16 @@ use crate::ui::Navigation;
 use crate::ui::Page;
 use crate::ui::app::App;
 use crate::ui::app::AppBuildError;
-use crate::ui::app::InputMapper;
 use crate::ui::tui::TuiError;
 use crate::ui::tui::renderer::TuiRenderer;
+use crate::ui::tui::renderer::TuiSettingsRenderer;
 use crate::ui::tui::view::TuiSettingsView;
 use crate::ui::tui::view::TuiTimerView;
-use crate::ui::view::SettingsViewActions;
-use crate::ui::view::TimerViewActions;
+use crate::ui::view::SettingsActions;
+use crate::ui::view::TimerActions;
 
 pub struct TuiRunner {
-    app: App<Input>,
+    app: App,
 }
 
 impl TuiRunner {
@@ -39,8 +39,6 @@ impl TuiRunner {
             .config(config)
             .timer_view(Box::new(TuiTimerView::new()))
             .settings_view(Box::new(TuiSettingsView::new()))
-            .timer_inputmap(Box::new(TimerInputMapper::new()))
-            .settings_inputmap(Box::new(SettingsInputMapper))
             .build()?;
 
         Ok(Self { app })
@@ -84,8 +82,8 @@ impl TuiRunner {
                 // Handle settings input directly on the renderer
                 if matches!(self.app.active_page(), Page::Settings) {
                     self.handle_settings_input(input, renderer)?;
-                } else {
-                    let nav = self.app.handle(input)?;
+                } else if let Some(action) = TimerInputMapper::new().into_action(input) {
+                    let nav = self.app.handle_timer(action)?;
                     if matches!(nav, Navigation::Quit) {
                         break;
                     }
@@ -124,8 +122,7 @@ impl TuiRunner {
                 settings.start_editing();
             }
             Esc => {
-                self.app
-                    .navigate(Navigation::GoTo(Page::Timer));
+                self.app.navigate(Navigation::GoTo(Page::Timer));
             }
             Char('q') => {
                 return Err(TuiError::from(std::io::Error::new(
@@ -142,7 +139,7 @@ impl TuiRunner {
     fn handle_settings_edit_input(
         &mut self,
         input: Input,
-        settings: &mut crate::ui::tui::renderer::TuiSettingsRenderer,
+        settings: &mut TuiSettingsRenderer,
     ) -> Result<(), TuiError> {
         use Input::*;
 
@@ -152,7 +149,7 @@ impl TuiRunner {
             }
             Enter => {
                 if let Some(action) = commit_settings_edit(settings) {
-                    let nav = self.app.handle_settings_action(action)?;
+                    let nav = self.app.handle_settings(action)?;
                     if matches!(nav, Navigation::Quit) {
                         return Err(TuiError::from(std::io::Error::new(
                             std::io::ErrorKind::Interrupted,
@@ -218,10 +215,10 @@ impl TimerInputMapper {
     }
 }
 
-impl InputMapper<Input, TimerViewActions> for TimerInputMapper {
-    fn into_action(&mut self, input: Input) -> Option<TimerViewActions> {
+impl InputMapper<Input, TimerActions> for TimerInputMapper {
+    fn into_action(&mut self, input: Input) -> Option<TimerActions> {
         use Input::*;
-        use TimerViewActions::*;
+        use TimerActions::*;
         let ret = match input {
             Left => Subtract(Duration::from_secs(30)),
             Down => Subtract(Duration::from_secs(60)),
@@ -241,8 +238,8 @@ impl InputMapper<Input, TimerViewActions> for TimerInputMapper {
 /// Platform-specific input mapper for settings (stateless, just maps to domain actions)
 pub struct SettingsInputMapper;
 
-impl InputMapper<Input, SettingsViewActions> for SettingsInputMapper {
-    fn into_action(&mut self, _input: Input) -> Option<SettingsViewActions> {
+impl InputMapper<Input, SettingsActions> for SettingsInputMapper {
+    fn into_action(&mut self, _input: Input) -> Option<SettingsActions> {
         // Settings input is handled directly in TuiRunner
         // This mapper is only used for actions that bypass navigation (e.g., direct quit)
         None
@@ -252,8 +249,8 @@ impl InputMapper<Input, SettingsViewActions> for SettingsInputMapper {
 /// Commit the current edit from the settings renderer state to a domain action
 fn commit_settings_edit(
     settings: &mut crate::ui::tui::renderer::TuiSettingsRenderer,
-) -> Option<SettingsViewActions> {
-    use SettingsViewActions::*;
+) -> Option<SettingsActions> {
+    use SettingsActions::*;
 
     let selected_idx = settings.selected_idx();
     let value = settings.edit_buffer().to_string();
@@ -298,4 +295,9 @@ fn parse_path(s: &str) -> Option<std::path::PathBuf> {
     } else {
         Some(std::path::PathBuf::from(s))
     }
+}
+
+pub trait InputMapper<I, A> {
+    #[allow(clippy::wrong_self_convention)]
+    fn into_action(&mut self, input: I) -> Option<A>;
 }

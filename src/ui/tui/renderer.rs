@@ -330,6 +330,7 @@ impl TuiSettingsRenderer {
     }
 
     /// Recursively flattens a command into rows
+    #[allow(clippy::only_used_in_recursion)]
     fn flatten_command(
         &self,
         cmd: SettingsRenderCommand,

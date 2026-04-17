@@ -27,7 +27,7 @@ pub struct TimerViewState {
 }
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
-pub enum TimerViewActions {
+pub enum TimerActions {
     Add(Duration),
     Subtract(Duration),
     TogglePause,
@@ -78,7 +78,7 @@ pub struct SettingsViewState {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum SettingsViewActions {
+pub enum SettingsActions {
     // Timer settings
     TimerFocus(Duration),
     TimerShort(Duration),
