@@ -34,10 +34,6 @@ impl TimerController {
         Ok(Navigation::Stay)
     }
 
-    pub fn tick(&mut self) {
-        self.model.update();
-    }
-
     pub fn render(&self) -> Vec<TimerRenderCommand> {
         let state = TimerViewState::from(&self.model);
         self.view.render(state)

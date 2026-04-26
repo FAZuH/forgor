@@ -41,7 +41,6 @@ impl App {
     }
 
     pub fn tick(&mut self) -> Result<(), AppError> {
-        self.timer.tick();
         Ok(())
     }
 
