@@ -449,13 +449,10 @@ impl TuiSettingsRenderer {
                 let idx = *item_idx;
                 *item_idx += 1;
                 let is_selected = self.selected_idx == idx;
-                let is_editing = is_selected && self.editing;
                 rows.push(SectionRow::Input {
                     label,
                     value,
-                    idx,
                     is_selected,
-                    is_editing,
                 });
             }
             SettingsRenderCommand::Checkbox { label, value } => {
@@ -465,7 +462,6 @@ impl TuiSettingsRenderer {
                 rows.push(SectionRow::Checkbox {
                     label,
                     value,
-                    idx,
                     is_selected,
                 });
             }
@@ -518,24 +514,12 @@ impl TuiSettingsRenderer {
                 label,
                 value,
                 is_selected,
-                is_editing,
                 ..
             } => {
                 let selected_bg = if *is_selected {
                     Style::default().bg(Color::DarkGray)
                 } else {
                     Style::default()
-                };
-
-                let (value_style, display_value) = if *is_editing {
-                    (
-                        Style::default()
-                            .fg(Color::Yellow)
-                            .add_modifier(Modifier::BOLD),
-                        format!("{}█", self.edit_buffer),
-                    )
-                } else {
-                    (Style::default(), value.clone())
                 };
 
                 let line = Line::from(vec![
@@ -545,7 +529,7 @@ impl TuiSettingsRenderer {
                             .add_modifier(Modifier::DIM)
                             .patch(selected_bg),
                     ),
-                    Span::styled(display_value, value_style.patch(selected_bg)),
+                    Span::styled(value, Style::default().patch(selected_bg)),
                 ]);
                 let p = Paragraph::new(line);
                 scroll_view.render_widget(p, area);
@@ -604,16 +588,11 @@ enum SectionRow {
     Input {
         label: String,
         value: String,
-        #[allow(dead_code)]
-        idx: u32,
         is_selected: bool,
-        is_editing: bool,
     },
     Checkbox {
         label: String,
         value: bool,
-        #[allow(dead_code)]
-        idx: u32,
         is_selected: bool,
     },
 }
