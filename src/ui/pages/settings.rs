@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use crate::config::Config;
+use crate::config::ConfigError;
 use crate::ui::Update;
 
 pub const SETTINGS_VIEW_ITEMS: u32 = 13;
@@ -25,56 +26,20 @@ pub enum SettingsMsg {
     SoundFocus(Option<PathBuf>),
     SoundShort(Option<PathBuf>),
     SoundLong(Option<PathBuf>),
+    // Other
+    SaveToDisk,
 }
 
 impl SettingsMsg {
-    pub fn is_toggle(&self) -> bool {
-        Self::is_toggle_index(self.index() as u32)
-    }
-
     pub fn is_toggle_index(index: u32) -> bool {
         (4..=6).contains(&index)
     }
+}
 
-    /// Converts [`SettingsActions`] into index.
-    ///
-    /// Returns [`usize::MAX`] if [`SettingsActions::Navigate`].
-    pub fn index(&self) -> usize {
-        match self {
-            Self::TimerFocus(_) => 0,
-            Self::TimerShort(_) => 1,
-            Self::TimerLong(_) => 2,
-            Self::TimerLongInterval(_) => 3,
-            Self::TimerAutoFocus => 4,
-            Self::TimerAutoShort => 5,
-            Self::TimerAutoLong => 6,
-            Self::HookFocus(_) => 7,
-            Self::HookShort(_) => 8,
-            Self::HookLong(_) => 9,
-            Self::SoundFocus(_) => 10,
-            Self::SoundShort(_) => 11,
-            Self::SoundLong(_) => 12,
-        }
-    }
-
-    pub fn from_index(index: usize) -> Option<Self> {
-        match index {
-            0 => Some(Self::TimerFocus(Duration::default())),
-            1 => Some(Self::TimerShort(Duration::default())),
-            2 => Some(Self::TimerLong(Duration::default())),
-            3 => Some(Self::TimerLongInterval(0)),
-            4 => Some(Self::TimerAutoFocus),
-            5 => Some(Self::TimerAutoShort),
-            6 => Some(Self::TimerAutoLong),
-            7 => Some(Self::HookFocus(String::new())),
-            8 => Some(Self::HookShort(String::new())),
-            9 => Some(Self::HookLong(String::new())),
-            10 => Some(Self::SoundFocus(None)),
-            11 => Some(Self::SoundShort(None)),
-            12 => Some(Self::SoundLong(None)),
-            _ => None,
-        }
-    }
+#[derive(Debug)]
+pub enum SettingsCmd {
+    None,
+    SavedToDisk(Result<(), ConfigError>),
 }
 
 pub struct SettingsUpdate {}
@@ -88,12 +53,14 @@ impl SettingsUpdate {
 impl Update for SettingsUpdate {
     type Msg = SettingsMsg;
     type Model = Config;
+    type Cmd = SettingsCmd;
 
-    fn update(msg: Self::Msg, mut model: Self::Model) -> Self::Model {
+    fn update(msg: Self::Msg, mut model: Self::Model) -> (Self::Model, Self::Cmd) {
         use SettingsMsg::*;
         let timer = &mut model.pomodoro.timer;
         let hook = &mut model.pomodoro.hook;
         let sound = &mut model.pomodoro.sound;
+        let mut cmd = SettingsCmd::None;
         match msg {
             // Timer
             TimerFocus(d) => timer.focus = d,
@@ -111,7 +78,8 @@ impl Update for SettingsUpdate {
             SoundFocus(p) => sound.focus = p,
             SoundShort(p) => sound.short = p,
             SoundLong(p) => sound.long = p,
+            SaveToDisk => cmd = SettingsCmd::SavedToDisk(model.save()),
         }
-        model
+        (model, cmd)
     }
 }

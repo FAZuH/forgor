@@ -14,6 +14,7 @@ use ratatui::prelude::*;
 use crate::config::Config;
 use crate::models::Pomodoro;
 use crate::ui::Update;
+use crate::ui::pages::settings::SettingsCmd;
 use crate::ui::pages::settings::SettingsMsg;
 use crate::ui::pages::settings::SettingsUpdate;
 use crate::ui::pages::timer::TimerMsg;
@@ -29,6 +30,7 @@ pub struct TuiView {
     router: Router,
     pomodoro: Pomodoro,
     config: Config,
+    latest_config_save: Config,
     should_quit: bool,
     renderer: TuiRenderer,
     terminal: Terminal<CrosstermBackend<std::io::Stdout>>,
@@ -43,6 +45,7 @@ impl TuiView {
         Ok(Self {
             router: Router::new(Page::Timer),
             pomodoro,
+            latest_config_save: config.clone(),
             config,
             should_quit: false,
             renderer,
@@ -127,29 +130,29 @@ impl TuiView {
 
         match input {
             Left | Char('h') => {
-                self.pomodoro =
+                (self.pomodoro, _) =
                     TimerUpdate::update(Subtract(Duration::from_secs(30)), self.pomodoro.clone());
             }
             Down | Char('j') => {
-                self.pomodoro =
+                (self.pomodoro, _) =
                     TimerUpdate::update(Subtract(Duration::from_secs(60)), self.pomodoro.clone());
             }
             Right | Char('l') => {
-                self.pomodoro =
+                (self.pomodoro, _) =
                     TimerUpdate::update(Add(Duration::from_secs(30)), self.pomodoro.clone());
             }
             Up | Char('k') => {
-                self.pomodoro =
+                (self.pomodoro, _) =
                     TimerUpdate::update(Add(Duration::from_secs(60)), self.pomodoro.clone());
             }
             Char(' ') => {
-                self.pomodoro = TimerUpdate::update(TogglePause, self.pomodoro.clone());
+                (self.pomodoro, _) = TimerUpdate::update(TogglePause, self.pomodoro.clone());
             }
             Enter => {
-                self.pomodoro = TimerUpdate::update(SkipSession, self.pomodoro.clone());
+                (self.pomodoro, _) = TimerUpdate::update(SkipSession, self.pomodoro.clone());
             }
             Backspace => {
-                self.pomodoro = TimerUpdate::update(ResetSession, self.pomodoro.clone());
+                (self.pomodoro, _) = TimerUpdate::update(ResetSession, self.pomodoro.clone());
             }
             Char('q') => self.router.navigate(Navigation::Quit),
             Char('s') => self.router.navigate(Navigation::GoTo(Page::Settings)),
@@ -174,13 +177,14 @@ impl TuiView {
             Down | Char('j') => settings.select_down(),
             Enter => {
                 if SettingsMsg::is_toggle_index(settings.selected_idx()) {
-                    self.save_settings()?
+                    self.update_settings()
                 } else {
                     settings.start_editing()
                 }
             }
+            Char('s') => self.save_settings(),
             Char(' ') if SettingsMsg::is_toggle_index(settings.selected_idx()) => {
-                self.save_settings()?
+                self.update_settings()
             }
             Esc => self.router.navigate(Navigation::GoTo(Page::Timer)),
             Char('q') => self.quit(),
@@ -196,7 +200,7 @@ impl TuiView {
         use Input::*;
         match input {
             Esc => settings.cancel_editing(),
-            Enter => self.save_settings()?,
+            Enter => self.update_settings(),
             Backspace => settings.pop_char(),
             Char(c) if c.is_ascii_digit() || c == ':' => {
                 settings.push_char(c);
@@ -207,7 +211,7 @@ impl TuiView {
         Ok(())
     }
 
-    fn save_settings(&mut self) -> Result<(), TuiError> {
+    fn update_settings(&mut self) {
         let settings = &mut self.renderer.settings;
         let selected_idx = settings.selected_idx();
         let value = settings.edit_buffer().to_string();
@@ -230,14 +234,36 @@ impl TuiView {
             10 => Some(SettingsMsg::SoundFocus(parse_path(&value))),
             11 => Some(SettingsMsg::SoundShort(parse_path(&value))),
             12 => Some(SettingsMsg::SoundLong(parse_path(&value))),
-            _ => None,
+            _ => return,
         };
 
         if let Some(m) = msg {
-            self.config = SettingsUpdate::update(m, self.config.clone());
+            (self.config, _) = SettingsUpdate::update(m, self.config.clone());
         }
 
-        Ok(())
+        self.renderer
+            .settings
+            .set_has_unsaved_changes(self.check_settings_updated());
+    }
+
+    fn save_settings(&mut self) {
+        let (model, cmd) = SettingsUpdate::update(SettingsMsg::SaveToDisk, self.config.clone());
+        self.config = model;
+
+        if let SettingsCmd::SavedToDisk(res) = cmd {
+            match res {
+                Ok(_) => {
+                    self.renderer.settings.set_has_unsaved_changes(false);
+                    self.latest_config_save = self.config.clone();
+                }
+                Err(_) => res.unwrap(),
+            }
+        }
+    }
+
+    // Compare current config with when it was latest saved.
+    fn check_settings_updated(&self) -> bool {
+        self.config != self.latest_config_save
     }
 
     fn quit(&mut self) {
