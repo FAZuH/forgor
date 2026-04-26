@@ -241,8 +241,6 @@ impl TuiView {
     }
 
     fn save_settings(&mut self) {
-        use crate::info;
-        info!("Saving config...");
         let (model, cmd) = SettingsUpdate::update(SettingsMsg::SaveToDisk, self.config.clone());
         self.config = model;
 
@@ -252,7 +250,6 @@ impl TuiView {
                 Err(_) => res.unwrap(),
             }
         }
-        info!("Saved config");
     }
 
     fn quit(&mut self) {
