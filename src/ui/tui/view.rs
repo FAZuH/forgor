@@ -181,6 +181,7 @@ impl TuiView {
                     settings.start_editing()
                 }
             }
+            Char('s') => self.save_settings(),
             Char(' ') if SettingsMsg::is_toggle_index(settings.selected_idx()) => {
                 self.update_settings()
             }
@@ -238,7 +239,20 @@ impl TuiView {
         if let Some(m) = msg {
             (self.config, _) = SettingsUpdate::update(m, self.config.clone());
         }
+    }
 
+    fn save_settings(&mut self) {
+        let render = &mut self.renderer.settings;
+
+        let (model, cmd) = SettingsUpdate::update(SettingsMsg::SaveToDisk, self.config.clone());
+        self.config = model;
+
+        if let SettingsCmd::SavedToDisk(res) = cmd {
+            match res {
+                Ok(_) => {},
+                Err(_) => {},
+            }
+        }
     }
 
     fn quit(&mut self) {
