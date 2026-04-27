@@ -165,10 +165,11 @@ impl TuiView {
     }
 
     fn play_sound(&mut self) {
-        // TODO: Handle errs
         if !self.sound.is_playing() {
             self.sound.set_sound(self.pomodoro.next_state());
-            self.sound.play().unwrap();
+            if let Err(e) = self.sound.play() {
+                error!("{e}")
+            }
         }
     }
 

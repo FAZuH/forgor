@@ -9,5 +9,7 @@ pub fn notify_pomodoro(state: PomodoroState) {
         PomodoroState::ShortBreak => ("Short break time!", "Take a quick breather."),
     };
 
-    Notification::new().summary(summary).body(body).show().ok();
+    if let Err(e) = Notification::new().summary(summary).body(body).show() {
+        log::error!("{e}")
+    }
 }
