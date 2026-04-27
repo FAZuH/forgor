@@ -1,3 +1,40 @@
+## [0.1.5](https://github.com/FAZuH/tomo/compare/v0.1.4...v0.1.5) (2026-04-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* Rename "notification" to "alarm" [pub] [no ci]
+* Add notification sound when a session finishes [pub]
+
+* refactor!(core): Rename "sound" to "notification" ([98a4b75](https://github.com/FAZuH/tomo/commit/98a4b750e9051806ac1a23e4a919d4d33f3638e5))
+* feat!(core): Add notification volume to config ([2361c69](https://github.com/FAZuH/tomo/commit/2361c69c23ee435a645532b3d5d3c95f29000aee))
+
+
+### feat
+
+* **tui:** Add notification volume configuration to settings page ([747c9a6](https://github.com/FAZuH/tomo/commit/747c9a69bd76db45aea15a9ebae351eec9779ed6))
+* **tui:** Add prompt for next session when session ends ([87889f0](https://github.com/FAZuH/tomo/commit/87889f04ddaa7013ac392b56daeca1d058972834))
+
+
+### perf
+
+* **tui:** Minor performance improvement in timer page rendering ([bd2b171](https://github.com/FAZuH/tomo/commit/bd2b171a564e4e57169ef1f6244388d67dbcd6a1))
+
+
+### fix
+
+* **tui:** Fix pomodoro state label not centered when paused ([44bbdfe](https://github.com/FAZuH/tomo/commit/44bbdfef3f73426b62bf46fbc317ed12b5af2eb3))
+
+
+### New Features
+
+* Add notification sound when a session finishes ([8cc366d](https://github.com/FAZuH/tomo/commit/8cc366dc2dfe180e4a994ce7da68eec9b673e35c))
+
+
+### Code Refactoring
+
+* Rename "notification" to "alarm" ([d923572](https://github.com/FAZuH/tomo/commit/d923572e9de6db6530cee892be9e2964a26c90cf))
+
 ## [0.1.4](https://github.com/FAZuH/tomo/compare/v0.1.3...v0.1.4) (2026-04-26)
 
 
@@ -9,7 +46,7 @@
 
 ### refactor
 
-* Rename logging var to TOMO_LOG [no ci] ([d825181](https://github.com/FAZuH/tomo/commit/d825181c519b8b29b5834863f90ae1e689fde568))
+* Rename logging var to TOMO_LOG ([d825181](https://github.com/FAZuH/tomo/commit/d825181c519b8b29b5834863f90ae1e689fde568))
 
 ## [0.1.3](https://github.com/FAZuH/tomo/compare/v0.1.2...v0.1.3) (2026-04-25)
 
@@ -22,12 +59,12 @@
 
 ### docs
 
-* Add screenshot to README [no ci] ([8d8c699](https://github.com/FAZuH/tomo/commit/8d8c69945471185d75985eaaf80c6b46e449dc8a))
+* Add screenshot to README ([8d8c699](https://github.com/FAZuH/tomo/commit/8d8c69945471185d75985eaaf80c6b46e449dc8a))
 
 
 ### fix
 
-* Duration configs not saved as simple seconds [no ci] ([796835f](https://github.com/FAZuH/tomo/commit/796835ff3cb929a9c520424525915688292f1d0f))
+* Duration configs not saved as simple seconds ([796835f](https://github.com/FAZuH/tomo/commit/796835ff3cb929a9c520424525915688292f1d0f))
 
 ## [0.1.2](https://github.com/FAZuH/tomo/compare/v0.1.1...v0.1.2) (2026-04-17)
 
@@ -48,6 +85,4 @@
 * **tui:** Improve CPU usage ([8900d8c](https://github.com/FAZuH/tomo/commit/8900d8c783fdc5013bcbbbfd69ea6b6ef82c427f))
 
 ## [0.1.1](https://github.com/FAZuH/tomo/compare/v0.1.0...v0.1.1) (2026-04-17)
-
-## 0.1.0 (2026-04-17)
 
