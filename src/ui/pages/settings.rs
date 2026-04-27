@@ -23,14 +23,14 @@ pub enum SettingsMsg {
     HookFocus(String),
     HookShort(String),
     HookLong(String),
-    // Sound path settings
-    SoundPathFocus(Option<PathBuf>),
-    SoundPathShort(Option<PathBuf>),
-    SoundPathLong(Option<PathBuf>),
-    // Sound path settings
-    SoundVolumeFocus(Percentage),
-    SoundVolumeShort(Percentage),
-    SoundVolumeLong(Percentage),
+    // Notifications path settings
+    NotificationPathFocus(Option<PathBuf>),
+    NotificationPathShort(Option<PathBuf>),
+    NotificationPathLong(Option<PathBuf>),
+    // Notifications volume settings
+    NotificationVolumeFocus(Percentage),
+    NotificationVolumeShort(Percentage),
+    NotificationVolumeLong(Percentage),
     // Other
     SaveToDisk,
 }
@@ -64,7 +64,7 @@ impl Update for SettingsUpdate {
         use SettingsMsg::*;
         let timer = &mut model.pomodoro.timer;
         let hook = &mut model.pomodoro.hook;
-        let sound = &mut model.pomodoro.sound;
+        let notif = &mut model.pomodoro.notification;
         let mut cmd = SettingsCmd::None;
         match msg {
             // Timer
@@ -79,14 +79,14 @@ impl Update for SettingsUpdate {
             HookFocus(s) => hook.focus = s,
             HookShort(s) => hook.short = s,
             HookLong(s) => hook.long = s,
-            // Sound
-            SoundPathFocus(p) => sound.focus.path = p,
-            SoundPathShort(p) => sound.short.path = p,
-            SoundPathLong(p) => sound.long.path = p,
+            // Notifications
+            NotificationPathFocus(p) => notif.focus.path = p,
+            NotificationPathShort(p) => notif.short.path = p,
+            NotificationPathLong(p) => notif.long.path = p,
             SaveToDisk => cmd = SettingsCmd::SavedToDisk(model.save()),
-            SoundVolumeFocus(v) => sound.focus.volume = v,
-            SoundVolumeShort(v) => sound.short.volume = v,
-            SoundVolumeLong(v) => sound.long.volume = v,
+            NotificationVolumeFocus(v) => notif.focus.volume = v,
+            NotificationVolumeShort(v) => notif.short.volume = v,
+            NotificationVolumeLong(v) => notif.long.volume = v,
         }
         (model, cmd)
     }

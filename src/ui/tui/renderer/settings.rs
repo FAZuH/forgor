@@ -9,7 +9,7 @@ use tui_widgets::scrollview::ScrollViewState;
 use tui_widgets::scrollview::ScrollbarVisibility;
 
 use crate::config::Config;
-use crate::config::Sound;
+use crate::config::Notification;
 use crate::ui::pages::settings::SETTINGS_VIEW_ITEMS;
 
 pub struct TuiSettingsRenderer {
@@ -157,7 +157,7 @@ impl TuiSettingsRenderer {
 
         self.build_timer_section(config, &mut sections, &mut item_idx);
         self.build_hooks_section(config, &mut sections, &mut item_idx);
-        self.build_sounds_section(config, &mut sections, &mut item_idx);
+        self.build_notifs_section(config, &mut sections, &mut item_idx);
 
         sections
     }
@@ -281,77 +281,81 @@ impl TuiSettingsRenderer {
         });
     }
 
-    fn build_sounds_section(
+    fn build_notifs_section(
         &self,
         config: &Config,
         sections: &mut Vec<Section>,
         item_idx: &mut u32,
     ) {
-        let sound = &config.pomodoro.sound;
+        let notif = &config.pomodoro.notification;
         let mut rows = Vec::new();
 
-        // Sound Files subsection
-        rows.push(SectionRow::SubSectionHeader("Sound Files".to_string()));
+        // Notification Files subsection
+        rows.push(SectionRow::SubSectionHeader(
+            "Notification Files".to_string(),
+        ));
         self.add_input_to_rows(
             "Focus",
-            Self::get_sound_path_value(&sound.focus),
+            Self::get_notif_path_value(&notif.focus),
             &mut rows,
             item_idx,
         );
         self.add_input_to_rows(
             "Short Break",
-            Self::get_sound_path_value(&sound.short),
+            Self::get_notif_path_value(&notif.short),
             &mut rows,
             item_idx,
         );
         self.add_input_to_rows(
             "Long Break",
-            Self::get_sound_path_value(&sound.long),
+            Self::get_notif_path_value(&notif.long),
             &mut rows,
             item_idx,
         );
 
-        // Sound Volumes subsection
+        // Notification Volumes subsection
         rows.push(SectionRow::Blank);
-        rows.push(SectionRow::SubSectionHeader("Sound Volumes".to_string()));
+        rows.push(SectionRow::SubSectionHeader(
+            "Notification Volumes".to_string(),
+        ));
         self.add_input_to_rows(
             "Focus",
-            Self::get_sound_volume_value(&sound.focus),
+            Self::get_notif_volume_value(&notif.focus),
             &mut rows,
             item_idx,
         );
         self.add_input_to_rows(
             "Short Break",
-            Self::get_sound_volume_value(&sound.short),
+            Self::get_notif_volume_value(&notif.short),
             &mut rows,
             item_idx,
         );
         self.add_input_to_rows(
             "Long Break",
-            Self::get_sound_volume_value(&sound.long),
+            Self::get_notif_volume_value(&notif.long),
             &mut rows,
             item_idx,
         );
 
-        let sounds_height = 2 + rows.iter().map(|r| r.height()).sum::<u16>();
+        let height = 2 + rows.iter().map(|r| r.height()).sum::<u16>();
         sections.push(Section {
-            title: "󰕾 Sounds".to_string(),
-            color: SectionColor::Sounds,
-            height: sounds_height,
+            title: "󰕾 Notifications".to_string(),
+            color: SectionColor::Notifications,
+            height,
             rows,
         });
     }
 
-    fn get_sound_path_value(sound: &Sound) -> String {
-        sound
+    fn get_notif_path_value(notif: &Notification) -> String {
+        notif
             .path
             .as_ref()
             .map(|p| p.display().to_string())
             .unwrap_or_default()
     }
 
-    fn get_sound_volume_value(sound: &Sound) -> String {
-        sound.volume.to_string()
+    fn get_notif_volume_value(notif: &Notification) -> String {
+        notif.volume.to_string()
     }
 
     fn section_color_from_label(label: &str) -> SectionColor {
@@ -359,8 +363,8 @@ impl TuiSettingsRenderer {
             SectionColor::Timer
         } else if label.contains("Hook") {
             SectionColor::Hooks
-        } else if label.contains("Sound") {
-            SectionColor::Sounds
+        } else if label.contains("Notification") {
+            SectionColor::Notifications
         } else {
             SectionColor::Timer
         }
@@ -546,7 +550,7 @@ impl SectionRow {
 enum SectionColor {
     Timer,
     Hooks,
-    Sounds,
+    Notifications,
 }
 
 impl SectionColor {
@@ -554,7 +558,7 @@ impl SectionColor {
         match self {
             SectionColor::Timer => Color::Cyan,
             SectionColor::Hooks => Color::Yellow,
-            SectionColor::Sounds => Color::Magenta,
+            SectionColor::Notifications => Color::Magenta,
         }
     }
 
