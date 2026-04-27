@@ -1,3 +1,16 @@
+## [0.1.6](https://github.com/FAZuH/tomo/compare/v0.1.5...v0.1.6) (2026-04-27)
+
+
+### refactor
+
+* **core:** Set default long interval from 3 to 4 ([6bc3250](https://github.com/FAZuH/tomo/commit/6bc3250f2e400c551df90abb4eeb4eb9ea2b1abc))
+
+
+### feat
+
+* **core:** Add command hooks on session end ([71907e7](https://github.com/FAZuH/tomo/commit/71907e74ac78fba5079f3a8750f972bfb65d2b6d)), closes [#4](https://github.com/FAZuH/tomo/issues/4)
+* **core:** Notify on session transitions ([45b8e90](https://github.com/FAZuH/tomo/commit/45b8e90deea6c34306fcea34ae653614dd25d500))
+
 ## [0.1.5](https://github.com/FAZuH/tomo/compare/v0.1.4...v0.1.5) (2026-04-27)
 
 
@@ -83,6 +96,4 @@
 ### perf
 
 * **tui:** Improve CPU usage ([8900d8c](https://github.com/FAZuH/tomo/commit/8900d8c783fdc5013bcbbbfd69ea6b6ef82c427f))
-
-## [0.1.1](https://github.com/FAZuH/tomo/compare/v0.1.0...v0.1.1) (2026-04-17)
 
