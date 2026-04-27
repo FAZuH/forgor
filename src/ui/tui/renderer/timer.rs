@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::time::Duration;
 
 use ratatui::layout::Flex;
@@ -13,10 +14,12 @@ pub struct TuiTimerRenderer {
     layout: Layout,
     paused_p: Paragraph<'static>,
     paused_width: u16,
+    state_labels: HashMap<PomodoroState, (String, u16)>,
 }
 
 impl TuiTimerRenderer {
     pub fn new() -> Self {
+        // Pre-compute paused text
         let paused_text = utils::ascii_future(" ( PAUSED )");
         let paused_width = utils::string_width(&paused_text) as u16;
         let paused_p = Paragraph::new(paused_text).style(
@@ -24,10 +27,24 @@ impl TuiTimerRenderer {
                 .fg(Color::Yellow)
                 .add_modifier(Modifier::BOLD),
         );
+
+        // Pre-compute state labels
+        let mut state_labels = HashMap::new();
+        for (state, text) in [
+            (PomodoroState::Focus, "FOCUS"),
+            (PomodoroState::ShortBreak, "SHORT BREAK"),
+            (PomodoroState::LongBreak, "LONG BREAK"),
+        ] {
+            let label = utils::ascii_future(text);
+            let width = utils::string_width(&label) as u16;
+            state_labels.insert(state, (label, width));
+        }
+
         Self {
             layout: Self::layout(),
             paused_p,
             paused_width,
+            state_labels,
         }
     }
 
@@ -62,31 +79,30 @@ impl TuiTimerRenderer {
     }
 
     fn state(&self, frame: &mut Frame, area: Rect, state: PomodoroState, paused: bool) {
-        // TODO: Pre-compute this and store ascii instead
-        let (label, color) = match state {
-            PomodoroState::Focus => ("FOCUS", Color::LightRed),
-            PomodoroState::ShortBreak => ("SHORT BREAK", Color::LightGreen),
-            PomodoroState::LongBreak => ("LONG BREAK", Color::LightCyan),
+        let (label, label_width) = &self.state_labels[&state];
+        let color = match state {
+            PomodoroState::Focus => Color::LightRed,
+            PomodoroState::ShortBreak => Color::LightGreen,
+            PomodoroState::LongBreak => Color::LightCyan,
         };
-        let label = utils::ascii_future(label);
         let center = Alignment::Center;
 
         if paused {
             let [area_label, area_paused] = Layout::horizontal([
-                Constraint::Length(utils::string_width(&label) as u16),
+                Constraint::Length(*label_width),
                 Constraint::Length(self.paused_width),
             ])
             .flex(Flex::Center)
             .areas::<2>(area);
 
-            let p_label = Paragraph::new(label)
+            let p_label = Paragraph::new(label.as_str())
                 .style(Style::default().fg(color).add_modifier(Modifier::BOLD))
                 .alignment(center);
 
-            frame.render_widget(&p_label, area_label);
+            frame.render_widget(p_label, area_label);
             frame.render_widget(&self.paused_p, area_paused);
         } else {
-            let p = Paragraph::new(label)
+            let p = Paragraph::new(label.as_str())
                 .style(Style::default().fg(color))
                 .alignment(center);
             frame.render_widget(p, area);
@@ -95,8 +111,7 @@ impl TuiTimerRenderer {
 
     fn timer(&self, frame: &mut Frame, area: Rect, remaining: &Duration, color: Color) {
         let time_str = format_duration_clock(remaining);
-        let ascii = utils::ascii_mono12(time_str);
-
+        let ascii = utils::ascii_mono12(&time_str);
         let width = utils::string_width(&ascii) as u16;
         let height = utils::string_height(&ascii) as u16;
         let area = area.centered(Constraint::Length(width), Constraint::Length(height));

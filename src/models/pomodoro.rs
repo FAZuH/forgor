@@ -224,7 +224,7 @@ impl Default for Pomodoro {
     }
 }
 
-#[derive(Clone, Debug, Copy, PartialEq, Eq)]
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
 pub enum PomodoroState {
     Focus,
     LongBreak,
