@@ -12,6 +12,7 @@ use crossterm::terminal::enable_raw_mode;
 use ratatui::prelude::*;
 
 use crate::config::Config;
+use crate::config::Percentage;
 use crate::models::Pomodoro;
 use crate::models::pomodoro::PomodoroState;
 use crate::ui::Update;
@@ -284,6 +285,10 @@ impl TuiView {
             10 => Some(SoundPathFocus(parse_path(&value))),
             11 => Some(SoundPathShort(parse_path(&value))),
             12 => Some(SoundPathLong(parse_path(&value))),
+            // Sound volume settings (10-12)
+            13 => Some(SoundVolumeFocus(parse_volume(&value))),
+            14 => Some(SoundVolumeShort(parse_volume(&value))),
+            15 => Some(SoundVolumeLong(parse_volume(&value))),
             _ => return,
         };
 
@@ -322,6 +327,7 @@ impl TuiView {
     }
 }
 
+// TODO: show error instead of default
 fn parse_duration_minutes(s: &str) -> Duration {
     s.parse::<u64>()
         .map(|m| Duration::from_secs(m * 60))
@@ -333,5 +339,13 @@ fn parse_path(s: &str) -> Option<std::path::PathBuf> {
         None
     } else {
         Some(std::path::PathBuf::from(s))
+    }
+}
+
+fn parse_volume(s: &str) -> Percentage {
+    if s.is_empty() {
+        Percentage::default()
+    } else {
+        Percentage::try_from(s).unwrap_or_default()
     }
 }
