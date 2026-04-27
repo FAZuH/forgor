@@ -12,13 +12,22 @@ use crate::utils;
 pub struct TuiTimerRenderer {
     layout: Layout,
     paused_p: Paragraph<'static>,
+    paused_width: u16,
 }
 
 impl TuiTimerRenderer {
     pub fn new() -> Self {
+        let paused_text = utils::ascii_future(" ( PAUSED )");
+        let paused_width = utils::string_width(&paused_text) as u16;
+        let paused_p = Paragraph::new(paused_text).style(
+            Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD),
+        );
         Self {
             layout: Self::layout(),
-            paused_p: Self::paused_paragraph(),
+            paused_p,
+            paused_width,
         }
     }
 
@@ -65,7 +74,7 @@ impl TuiTimerRenderer {
         if paused {
             let [area_label, area_paused] = Layout::horizontal([
                 Constraint::Length(utils::string_width(&label) as u16),
-                Constraint::Length(67),
+                Constraint::Length(self.paused_width),
             ])
             .flex(Flex::Center)
             .areas::<2>(area);
@@ -170,15 +179,6 @@ impl TuiTimerRenderer {
             Constraint::Length(1), // shortcuts
             Constraint::Fill(1),
         ])
-    }
-
-    fn paused_paragraph() -> Paragraph<'static> {
-        let label = utils::ascii_future(" ( PAUSED )");
-        Paragraph::new(label).style(
-            Style::default()
-                .fg(Color::Yellow)
-                .add_modifier(Modifier::BOLD),
-        )
     }
 }
 
