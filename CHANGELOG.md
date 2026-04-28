@@ -1,3 +1,18 @@
+## [0.1.7](https://github.com/FAZuH/tomo/compare/v0.1.6...v0.1.7) (2026-04-28)
+
+
+### feat
+
+* Add warning/error toasts ([145dd17](https://github.com/FAZuH/tomo/commit/145dd172c91c512a104ee21a5a398b73a6b21fdb))
+* **tui:** Add input validation to settings page ([679f389](https://github.com/FAZuH/tomo/commit/679f38962062174b135a05d812a3fde24449372d)), closes [#23](https://github.com/FAZuH/tomo/issues/23)
+* **tui:** Add scroll input handling for settings page ([5a5f24a](https://github.com/FAZuH/tomo/commit/5a5f24a96f756166e28da81d184ad1af86126dac)), closes [#20](https://github.com/FAZuH/tomo/issues/20)
+* **tui:** Improve settings input UI/UX ([05c1845](https://github.com/FAZuH/tomo/commit/05c18453f30e4731b4adfd40bd9571eb1d44dd25)), closes [#21](https://github.com/FAZuH/tomo/issues/21)
+
+
+### perf
+
+* Improve performance of data handling ([a9d19ce](https://github.com/FAZuH/tomo/commit/a9d19ce3f2cfa6dd9ccd96f65a08e70834201b93))
+
 ## [0.1.6](https://github.com/FAZuH/tomo/compare/v0.1.5...v0.1.6) (2026-04-27)
 
 
@@ -78,22 +93,4 @@
 ### fix
 
 * Duration configs not saved as simple seconds ([796835f](https://github.com/FAZuH/tomo/commit/796835ff3cb929a9c520424525915688292f1d0f))
-
-## [0.1.2](https://github.com/FAZuH/tomo/compare/v0.1.1...v0.1.2) (2026-04-17)
-
-
-### fix
-
-* config not being loaded properly ([5ec5829](https://github.com/FAZuH/tomo/commit/5ec58299f87469f63c6f986ac417d8d75322810a))
-
-
-### feat
-
-* **tui:** Add vim-like bindings for timer adjustment ([1206f1e](https://github.com/FAZuH/tomo/commit/1206f1e92bf6fc9963b518dc97abd07b8ea064b9))
-* **tui:** toggle settings checkbox space/enter ([a730298](https://github.com/FAZuH/tomo/commit/a730298e4c3d477289c3520998b72fac21d5b278))
-
-
-### perf
-
-* **tui:** Improve CPU usage ([8900d8c](https://github.com/FAZuH/tomo/commit/8900d8c783fdc5013bcbbbfd69ea6b6ef82c427f))
 
