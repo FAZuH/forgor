@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::thread::sleep;
 use std::time::Duration;
 use std::time::Instant;
@@ -6,12 +7,15 @@ use crossterm::event::Event;
 use crossterm::event::KeyCode;
 use crossterm::event::MouseEventKind;
 use crossterm::event::{self};
-use log::error;
+use ratatui::widgets::Widget;
+use ratatui_toaster::ToastBuilder;
+use ratatui_toaster::ToastType;
 use tui_widgets::prompts::State as PromptState;
 use tui_widgets::prompts::Status;
 
 use crate::config::Config;
 use crate::config::Percentage;
+use crate::config::pomodoro::Hooks;
 use crate::config::pomodoro::Timers;
 use crate::models::pomodoro::State;
 use crate::services::SoundService;
@@ -27,6 +31,7 @@ use crate::ui::router::Router;
 use crate::ui::tui::TuiError;
 use crate::ui::tui::backend::Tui;
 use crate::ui::tui::renderer::TuiRenderer;
+use crate::ui::tui::toasts::ToastHandler;
 use crate::ui::update::settings::SettingsMsg;
 use crate::ui::update::settings::SettingsUpdate;
 use crate::ui::update::timer::TimerCmd;
@@ -38,10 +43,13 @@ type Sound = Box<dyn SoundService<SoundType = State>>;
 pub struct TuiView {
     router: Router,
     latest_config_save: Option<Config>,
-    renderer: TuiRenderer,
+
     terminal: Tui,
+
+    renderer: TuiRenderer,
     sound: Sound,
     tick: TickHandler,
+    toast: ToastHandler,
 }
 
 impl View for TuiView {
@@ -64,6 +72,7 @@ impl TuiView {
             terminal,
             sound,
             tick: TickHandler::default(),
+            toast: ToastHandler::default(),
         })
     }
 
@@ -96,6 +105,7 @@ impl TuiView {
     }
 
     fn tick(&mut self, mut model: AppModel) -> Result<AppModel, TuiError> {
+        self.toast.tick();
         let cmd = TimerUpdate::tick(
             self.should_auto_next(model.timer.state(), &model.settings.pomodoro.timer),
             &model.timer,
@@ -111,12 +121,12 @@ impl TuiView {
             TimerCmd::PromptNextSession => {
                 if !self.renderer.timer.prompt_next_session() {
                     // only runs on once per session
-                    model = self.on_session_end(model);
+                    self.on_session_end(&model);
                 }
                 self.renderer.timer.set_prompt_next_session(true);
             }
             TimerCmd::NextSession => {
-                model = self.on_session_end(model);
+                self.on_session_end(&model);
                 model = self.next_session(model);
             }
             TimerCmd::SessionContinued => {}
@@ -124,30 +134,34 @@ impl TuiView {
         model
     }
 
-    fn on_session_end(&mut self, mut model: AppModel) -> AppModel {
-        // TODO: Handle errs
-        model = self.run_hooks(model);
+    fn on_session_end(&mut self, model: &AppModel) {
+        self.run_hooks(&model.settings.pomodoro.hook, model.timer.state());
         self.play_sound(model.timer.next_state());
         self.send_notification(model.timer.next_state());
-        model
     }
 
-    fn run_hooks(&self, model: AppModel) -> AppModel {
-        run_cmds(&model.settings.pomodoro.hook, model.timer.state());
-        model
+    fn run_hooks(&self, conf: &Hooks, curr_state: State) {
+        run_cmds(conf, curr_state);
     }
 
-    fn send_notification(&self, next_state: State) {
-        notify(next_state).unwrap();
+    fn send_notification(&mut self, next_state: State) {
+        if let Err(e) = notify(next_state) {
+            self.show_toast(e.to_string(), ToastType::Error);
+        }
     }
 
     fn play_sound(&mut self, next_state: State) {
         if !self.sound.is_playing() {
             self.sound.set_sound(next_state);
             if let Err(e) = self.sound.play() {
-                error!("{e}")
+                self.show_toast(e.to_string(), ToastType::Error);
             }
         }
+    }
+
+    fn show_toast(&mut self, message: impl Into<Cow<'static, str>>, r#type: ToastType) {
+        self.toast
+            .show_toast(ToastBuilder::new(message.into()).toast_type(r#type));
     }
 
     fn next_session(&mut self, mut model: AppModel) -> AppModel {
@@ -165,8 +179,11 @@ impl TuiView {
 
     fn render_terminal(&mut self, model: &AppModel) -> Result<(), TuiError> {
         self.terminal.draw(|f| {
+            let area = f.area();
             self.renderer
-                .flush(f, &self.router, &model.timer, &model.settings)
+                .flush(f, &self.router, &model.timer, &model.settings);
+            self.toast.set_area(area);
+            self.toast.render(area, f.buffer_mut());
         })?;
         Ok(())
     }
@@ -354,12 +371,19 @@ impl TuiView {
     }
 
     fn save_settings(&mut self, model: &AppModel) {
-        model.settings.save().unwrap();
-        self.renderer.settings.set_has_unsaved_changes(false);
-        self.snapshot_settings(model);
+        match model.settings.save() {
+            Ok(()) => {
+                self.renderer.settings.set_has_unsaved_changes(false);
+                self.snapshot_settings(model);
+                self.show_toast("Settings saved!", ToastType::Success);
+            }
+            Err(e) => {
+                self.show_toast(format!("Failed to save: {e}"), ToastType::Error);
+            }
+        }
     }
 
-    // Compare current config with when it was latest saved.
+    /// Compare current config with when it was latest saved.
     fn check_settings_updated(&self, model: &AppModel) -> bool {
         if let Some(last) = &self.latest_config_save {
             return model.settings != *last;
@@ -367,6 +391,9 @@ impl TuiView {
         true
     }
 
+    /// Snapshot current settings.
+    ///
+    /// Use with [`Self::check_settings_updated`]
     fn snapshot_settings(&mut self, model: &AppModel) {
         self.latest_config_save = Some(model.settings.clone())
     }
