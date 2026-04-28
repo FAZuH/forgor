@@ -1,5 +1,4 @@
 pub mod backend;
-pub mod input;
 pub mod renderer;
 pub mod view;
 

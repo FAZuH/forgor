@@ -1,9 +1,18 @@
+use std::borrow::Cow;
+
+use ratatui::layout::Flex;
 use ratatui::prelude::*;
 use ratatui::widgets::Block;
 use ratatui::widgets::Borders;
+use ratatui::widgets::Clear;
 use ratatui::widgets::Paragraph;
 use tui_widgets::big_text::BigText;
 use tui_widgets::big_text::PixelSize;
+use tui_widgets::prompts::FocusState;
+use tui_widgets::prompts::Prompt;
+use tui_widgets::prompts::State as PromptState;
+use tui_widgets::prompts::TextPrompt;
+use tui_widgets::prompts::TextState;
 use tui_widgets::scrollview::ScrollView;
 use tui_widgets::scrollview::ScrollViewState;
 use tui_widgets::scrollview::ScrollbarVisibility;
@@ -19,8 +28,7 @@ use crate::ui::update::settings::SETTINGS_VIEW_ITEMS;
 pub struct TuiSettingsRenderer {
     scroll_state: ScrollViewState,
     selected_idx: u32,
-    editing: bool,
-    edit_buffer: String,
+    pub prompt: Option<SettingsPrompt>,
     has_unsaved_changes: bool,
 }
 
@@ -29,8 +37,7 @@ impl TuiSettingsRenderer {
         Self {
             scroll_state: ScrollViewState::default(),
             selected_idx: 0,
-            editing: false,
-            edit_buffer: String::new(),
+            prompt: None,
             has_unsaved_changes: false,
         }
     }
@@ -51,16 +58,71 @@ impl TuiSettingsRenderer {
             .clamp(0, SETTINGS_VIEW_ITEMS - 1);
     }
 
+    /// Scroll up by one row
+    pub fn scroll_up(&mut self) {
+        self.scroll_state.scroll_up();
+    }
+
+    /// Scroll down by one row
+    pub fn scroll_down(&mut self) {
+        self.scroll_state.scroll_down();
+    }
+
     /// Start editing the currently selected field
-    pub fn start_editing(&mut self) {
-        self.editing = true;
-        self.edit_buffer.clear();
+    pub fn start_editing_for_field(&mut self, config: &PomodoroConfig) {
+        let (label, value) = match self.selected_idx {
+            0 => ("Focus", format!("{}", config.timer.focus.as_secs() / 60)),
+            1 => (
+                "Short Break",
+                format!("{}", config.timer.short.as_secs() / 60),
+            ),
+            2 => (
+                "Long Break",
+                format!("{}", config.timer.long.as_secs() / 60),
+            ),
+            3 => (
+                "Long Break Interval",
+                format!("{}", config.timer.long_interval),
+            ),
+            7 => ("Focus Hook", config.hook.focus.clone()),
+            8 => ("Short Break Hook", config.hook.short.clone()),
+            9 => ("Long Break Hook", config.hook.long.clone()),
+            10 => ("Focus Alarm", get_alarm_path_value(&config.alarm.focus)),
+            11 => (
+                "Short Break Alarm",
+                get_alarm_path_value(&config.alarm.short),
+            ),
+            12 => ("Long Break Alarm", get_alarm_path_value(&config.alarm.long)),
+            13 => (
+                "Focus Alarm Volume",
+                get_alarm_volume_value(&config.alarm.focus),
+            ),
+            14 => (
+                "Short Break Alarm Volume",
+                get_alarm_volume_value(&config.alarm.short),
+            ),
+            15 => (
+                "Long Break Alarm Volume",
+                get_alarm_volume_value(&config.alarm.long),
+            ),
+            _ => return, // Cannot edit toggles or out of bounds
+        };
+
+        let value_len = value.len();
+        let mut text_state = TextState::new()
+            .with_focus(FocusState::Focused)
+            .with_value(value);
+        *PromptState::position_mut(&mut text_state) = value_len;
+
+        self.prompt = Some(SettingsPrompt {
+            text_state,
+            label: label.to_string(),
+        });
     }
 
     /// Cancel editing
     pub fn cancel_editing(&mut self) {
-        self.editing = false;
-        self.edit_buffer.clear();
+        self.prompt = None;
     }
 
     /// Get current selection index
@@ -70,22 +132,20 @@ impl TuiSettingsRenderer {
 
     /// Check if currently editing
     pub fn is_editing(&self) -> bool {
-        self.editing
+        self.prompt.is_some()
     }
 
-    /// Get the current edit buffer
-    pub fn edit_buffer(&self) -> &str {
-        &self.edit_buffer
+    pub fn prompt_state_mut(&mut self) -> Option<&mut SettingsPrompt> {
+        self.prompt.as_mut()
     }
 
-    /// Push a character to the edit buffer
-    pub fn push_char(&mut self, c: char) {
-        self.edit_buffer.push(c);
-    }
-
-    /// Pop a character from the edit buffer
-    pub fn pop_char(&mut self) {
-        self.edit_buffer.pop();
+    /// Take the finalized edit value
+    pub fn take_edit_value(&mut self) -> String {
+        if let Some(prompt) = self.prompt.take() {
+            prompt.text_state.value().to_string()
+        } else {
+            String::new()
+        }
     }
 
     pub fn set_has_unsaved_changes(&mut self, state: bool) {
@@ -125,6 +185,9 @@ impl TuiSettingsRenderer {
         }
 
         frame.render_stateful_widget(scroll_view, area, &mut self.scroll_state);
+
+        // Render prompt popup
+        self.render_prompt(frame, area);
     }
 
     fn render_title(&self, scroll_view: &mut ScrollView, area: Rect) {
@@ -152,6 +215,31 @@ impl TuiSettingsRenderer {
                 .add_modifier(Modifier::BOLD),
         )]);
         scroll_view.render_widget(Paragraph::new(line), area);
+    }
+
+    fn render_prompt(&mut self, frame: &mut Frame, area: Rect) {
+        // Render prompt overlay
+        if let Some(ref mut prompt) = self.prompt {
+            let popup_width = 50.min(area.width.saturating_sub(4));
+            let popup_height = 3;
+
+            let vertical = Layout::vertical([Constraint::Length(popup_height)]).flex(Flex::Center);
+            let horizontal =
+                Layout::horizontal([Constraint::Length(popup_width)]).flex(Flex::Center);
+            let [popup_area] = vertical.areas(area);
+            let [popup_area] = horizontal.areas(popup_area);
+
+            frame.render_widget(Clear, popup_area);
+
+            let block = Block::default()
+                .title(prompt.label.clone())
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Cyan));
+            let inner = block.inner(popup_area);
+            frame.render_widget(block, popup_area);
+
+            TextPrompt::new(Cow::Borrowed("")).draw(frame, inner, &mut prompt.text_state);
+        }
     }
 
     /// Build sections from config, calculating layout and identifying editable items
@@ -343,16 +431,6 @@ impl TuiSettingsRenderer {
             is_selected,
         });
     }
-
-    /// Scroll up by one row
-    pub fn scroll_up(&mut self) {
-        self.scroll_state.scroll_up();
-    }
-
-    /// Scroll down by one row
-    pub fn scroll_down(&mut self) {
-        self.scroll_state.scroll_down();
-    }
 }
 
 /// Represents a section with border
@@ -520,6 +598,11 @@ impl SectionColor {
             SectionColor::Timer
         }
     }
+}
+
+pub struct SettingsPrompt {
+    pub text_state: TextState<'static>,
+    pub label: String,
 }
 
 fn get_alarm_path_value(alarm: &Alarm) -> String {

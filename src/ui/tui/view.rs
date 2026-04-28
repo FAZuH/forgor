@@ -3,8 +3,12 @@ use std::time::Duration;
 use std::time::Instant;
 
 use crossterm::event::Event;
+use crossterm::event::KeyCode;
+use crossterm::event::MouseEventKind;
 use crossterm::event::{self};
 use log::error;
+use tui_widgets::prompts::State as PromptState;
+use tui_widgets::prompts::Status;
 
 use crate::config::Config;
 use crate::config::Percentage;
@@ -22,7 +26,6 @@ use crate::ui::router::Page;
 use crate::ui::router::Router;
 use crate::ui::tui::TuiError;
 use crate::ui::tui::backend::Tui;
-use crate::ui::tui::input::Input;
 use crate::ui::tui::renderer::TuiRenderer;
 use crate::ui::update::settings::SettingsMsg;
 use crate::ui::update::settings::SettingsUpdate;
@@ -70,6 +73,8 @@ impl TuiView {
         let mut last_tick = Instant::now();
         let tick_rate = Duration::from_millis(1000);
 
+        self.snapshot_settings(&model);
+
         while !self.should_quit {
             let now = Instant::now();
             if now.duration_since(last_tick) >= tick_rate {
@@ -91,13 +96,9 @@ impl TuiView {
         Ok(())
     }
 
-    fn get_input() -> Result<Option<Input>, TuiError> {
+    fn get_input() -> Result<Option<Event>, TuiError> {
         if event::poll(Duration::from_millis(10))? {
-            match event::read()? {
-                Event::Key(key) => Ok(Input::from_keyevent(key)),
-                Event::Mouse(mouse) => Ok(Input::from_mouseevent(mouse)),
-                _ => Ok(None),
-            }
+            Ok(Some(event::read()?))
         } else {
             Ok(None)
         }
@@ -186,7 +187,7 @@ impl TuiView {
 
     fn handle_key_event(
         &mut self,
-        input: Input,
+        input: Event,
         mut model: AppModel,
     ) -> Result<AppModel, TuiError> {
         // Handle settings input directly on the renderer
@@ -198,93 +199,101 @@ impl TuiView {
         Ok(model)
     }
 
-    fn handle_timer(&mut self, input: Input, mut model: AppModel) -> Result<AppModel, TuiError> {
-        use Input::*;
+    fn handle_timer(&mut self, event: Event, mut model: AppModel) -> Result<AppModel, TuiError> {
+        use KeyCode as K;
         use TimerMsg::*;
 
         if self.renderer.timer.prompt_next_session() {
-            return self.handle_timer_nextstate_prompt(input, model);
+            return self.handle_timer_nextstate_prompt(event, model);
         }
 
-        match input {
-            Left | Char('h') => {
-                (model.timer, _) =
-                    TimerUpdate::update(Subtract(Duration::from_secs(30)), model.timer);
+        if let Event::Key(key) = event {
+            match key.code {
+                K::Left | K::Char('h') => {
+                    (model.timer, _) =
+                        TimerUpdate::update(Subtract(Duration::from_secs(30)), model.timer);
+                }
+                K::Down | K::Char('j') => {
+                    (model.timer, _) =
+                        TimerUpdate::update(Subtract(Duration::from_secs(60)), model.timer);
+                }
+                K::Right | K::Char('l') => {
+                    (model.timer, _) =
+                        TimerUpdate::update(Add(Duration::from_secs(30)), model.timer);
+                }
+                K::Up | K::Char('k') => {
+                    (model.timer, _) =
+                        TimerUpdate::update(Add(Duration::from_secs(60)), model.timer);
+                }
+                K::Char(' ') => {
+                    (model.timer, _) = TimerUpdate::update(TogglePause, model.timer);
+                }
+                K::Enter => {
+                    (model.timer, _) = TimerUpdate::update(SkipSession, model.timer);
+                }
+                K::Backspace => {
+                    (model.timer, _) = TimerUpdate::update(ResetSession, model.timer);
+                }
+                K::Char('q') => self.quit(),
+                K::Char('s') => self.router.navigate(Navigation::GoTo(Page::Settings)),
+                _ => {}
             }
-            Down | Char('j') => {
-                (model.timer, _) =
-                    TimerUpdate::update(Subtract(Duration::from_secs(60)), model.timer);
-            }
-            Right | Char('l') => {
-                (model.timer, _) = TimerUpdate::update(Add(Duration::from_secs(30)), model.timer);
-            }
-            Up | Char('k') => {
-                (model.timer, _) = TimerUpdate::update(Add(Duration::from_secs(60)), model.timer);
-            }
-            Char(' ') => {
-                (model.timer, _) = TimerUpdate::update(TogglePause, model.timer);
-            }
-            Enter => {
-                (model.timer, _) = TimerUpdate::update(SkipSession, model.timer);
-            }
-            Backspace => {
-                (model.timer, _) = TimerUpdate::update(ResetSession, model.timer);
-            }
-            Char('q') => self.quit(),
-            Char('s') => self.router.navigate(Navigation::GoTo(Page::Settings)),
-            _ => {}
         }
         Ok(model)
     }
 
     fn handle_timer_nextstate_prompt(
         &mut self,
-        input: Input,
+        event: Event,
         mut model: AppModel,
     ) -> Result<AppModel, TuiError> {
-        use Input::*;
-
-        match input {
-            Enter | Char('y') => {
-                model = self.next_session(model);
-                self.renderer.timer.set_prompt_next_session(false);
+        if let Event::Key(key) = event {
+            match key.code {
+                KeyCode::Enter | KeyCode::Char('y') => {
+                    model = self.next_session(model);
+                    self.renderer.timer.set_prompt_next_session(false);
+                }
+                KeyCode::Esc | KeyCode::Char('n') => self.quit(),
+                _ => {}
             }
-            Esc | Char('n') => self.quit(),
-            _ => {}
         }
-
         Ok(model)
     }
 
     /// Handle settings page input directly, mutating renderer state
-    fn handle_settings(&mut self, input: Input, mut model: AppModel) -> Result<AppModel, TuiError> {
+    fn handle_settings(&mut self, event: Event, mut model: AppModel) -> Result<AppModel, TuiError> {
         let settings = &mut self.renderer.settings;
 
         // When editing, handle text input
         if settings.is_editing() {
-            return self.handle_settings_edit(input, model);
+            return self.handle_settings_edit(event, model);
         }
 
         // When navigating, handle navigation input
-        use Input::*;
-        match input {
-            Up | Char('k') => settings.select_up(),
-            Down | Char('j') => settings.select_down(),
-            Enter => {
-                if SettingsMsg::is_toggle_index(settings.selected_idx()) {
-                    model = self.update_settings(model)
-                } else {
-                    settings.start_editing()
+        match event {
+            Event::Key(key) => match key.code {
+                KeyCode::Up | KeyCode::Char('k') => settings.select_up(),
+                KeyCode::Down | KeyCode::Char('j') => settings.select_down(),
+                KeyCode::Enter => {
+                    if SettingsMsg::is_toggle_index(settings.selected_idx()) {
+                        model = self.update_settings(model)
+                    } else {
+                        settings.start_editing_for_field(&model.settings.pomodoro)
+                    }
                 }
-            }
-            Char('s') => self.save_settings(&model),
-            Char(' ') if SettingsMsg::is_toggle_index(settings.selected_idx()) => {
-                model = self.update_settings(model)
-            }
-            Esc => self.router.navigate(Navigation::GoTo(Page::Timer)),
-            Char('q') => self.quit(),
-            ScrollDown => self.renderer.settings.scroll_down(),
-            ScrollUp => self.renderer.settings.scroll_up(),
+                KeyCode::Char('s') => self.save_settings(&model),
+                KeyCode::Char(' ') if SettingsMsg::is_toggle_index(settings.selected_idx()) => {
+                    model = self.update_settings(model)
+                }
+                KeyCode::Esc => self.router.navigate(Navigation::GoTo(Page::Timer)),
+                KeyCode::Char('q') => self.quit(),
+                _ => {}
+            },
+            Event::Mouse(mouse) => match mouse.kind {
+                MouseEventKind::ScrollDown => settings.scroll_down(),
+                MouseEventKind::ScrollUp => settings.scroll_up(),
+                _ => {}
+            },
             _ => {}
         }
 
@@ -293,20 +302,25 @@ impl TuiView {
 
     fn handle_settings_edit(
         &mut self,
-        input: Input,
+        event: Event,
         mut model: AppModel,
     ) -> Result<AppModel, TuiError> {
         let settings = &mut self.renderer.settings;
 
-        use Input::*;
-        match input {
-            Esc => settings.cancel_editing(),
-            Enter => model = self.update_settings(model),
-            Backspace => settings.pop_char(),
-            Char(c) if c.is_ascii_digit() || c == ':' => {
-                settings.push_char(c);
+        if let Event::Key(key) = event
+            && let Some(prompt) = settings.prompt_state_mut()
+        {
+            prompt.text_state.handle_key_event(key);
+
+            match prompt.text_state.status() {
+                Status::Done => {
+                    model = self.update_settings(model);
+                }
+                Status::Aborted => {
+                    settings.cancel_editing();
+                }
+                _ => {}
             }
-            _ => {}
         }
 
         Ok(model)
@@ -315,7 +329,7 @@ impl TuiView {
     fn update_settings(&mut self, mut model: AppModel) -> AppModel {
         let settings = &mut self.renderer.settings;
         let selected_idx = settings.selected_idx();
-        let value = settings.edit_buffer().to_string();
+        let value = settings.take_edit_value();
         settings.cancel_editing();
 
         use SettingsMsg::*;
@@ -356,7 +370,7 @@ impl TuiView {
     fn save_settings(&mut self, model: &AppModel) {
         model.settings.save().unwrap();
         self.renderer.settings.set_has_unsaved_changes(false);
-        self.latest_config_save = Some(model.settings);
+        self.snapshot_settings(model);
     }
 
     // Compare current config with when it was latest saved.
@@ -364,7 +378,11 @@ impl TuiView {
         if let Some(last) = &self.latest_config_save {
             return model.settings != *last;
         }
-        false
+        true
+    }
+
+    fn snapshot_settings(&mut self, model: &AppModel) {
+        self.latest_config_save = Some(model.settings.clone())
     }
 
     fn quit(&mut self) {
