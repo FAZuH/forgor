@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::path::PathBuf;
 use std::thread::sleep;
 use std::time::Duration;
 use std::time::Instant;
@@ -326,39 +327,45 @@ impl TuiView {
         let value = settings.take_edit_value();
         settings.cancel_editing();
 
-        use SettingsMsg::*;
-        let msg = match selected_idx {
-            // Timer settings (0-6)
-            0 => Some(TimerFocus(parse_duration_minutes(&value))),
-            1 => Some(TimerShort(parse_duration_minutes(&value))),
-            2 => Some(TimerLong(parse_duration_minutes(&value))),
-            3 => Some(TimerLongInterval(value.parse().unwrap_or(4))),
-            4 => Some(TimerAutoFocus),
-            5 => Some(TimerAutoShort),
-            6 => Some(TimerAutoLong),
-            // Hook settings (7-9)
-            7 => Some(HookFocus(value)),
-            8 => Some(HookShort(value)),
-            9 => Some(HookLong(value)),
-            // Alarm path settings (10-12)
-            10 => Some(AlarmPathFocus(parse_path(&value))),
-            11 => Some(AlarmPathShort(parse_path(&value))),
-            12 => Some(AlarmPathLong(parse_path(&value))),
-            // Alarm volume settings (10-12)
-            13 => Some(AlarmVolumeFocus(parse_volume(&value))),
-            14 => Some(AlarmVolumeShort(parse_volume(&value))),
-            15 => Some(AlarmVolumeLong(parse_volume(&value))),
-            _ => return model,
+        let msg = match self.msg_from_edit(value, selected_idx) {
+            Some(msg) => msg,
+            None => return model,
         };
 
-        if let Some(m) = msg {
-            (model.settings, _) = SettingsUpdate::update(m, model.settings);
-        }
+        (model.settings, _) = SettingsUpdate::update(msg, model.settings);
 
         self.renderer
             .settings
             .set_has_unsaved_changes(self.check_settings_updated(&model));
         model
+    }
+
+    fn msg_from_edit(&mut self, value: String, selected_idx: u32) -> Option<SettingsMsg> {
+        use SettingsMsg::*;
+        let msg = match selected_idx {
+            // Timer settings (0-6)
+            0 => TimerFocus(self.parse_dur(value)?),
+            1 => TimerShort(self.parse_dur(value)?),
+            2 => TimerLong(self.parse_dur(value)?),
+            3 => TimerLongInterval(self.try_parse(value, |s| s.parse::<u32>(), "integer")?),
+            4 => TimerAutoFocus,
+            5 => TimerAutoShort,
+            6 => TimerAutoLong,
+            // Hook settings (7-9)
+            7 => HookFocus(value),
+            8 => HookShort(value),
+            9 => HookLong(value),
+            // Alarm path settings (10-12)
+            10 => AlarmPathFocus(self.parse_path(value)),
+            11 => AlarmPathShort(self.parse_path(value)),
+            12 => AlarmPathLong(self.parse_path(value)),
+            // Alarm volume settings (10-12)
+            13 => AlarmVolumeFocus(self.parse_vol(value)?),
+            14 => AlarmVolumeShort(self.parse_vol(value)?),
+            15 => AlarmVolumeLong(self.parse_vol(value)?),
+            _ => return None,
+        };
+        Some(msg)
     }
 
     fn save_settings(&mut self, model: &AppModel) {
@@ -392,28 +399,48 @@ impl TuiView {
     fn quit(&mut self) {
         self.router.navigate(Navigation::Quit);
     }
-}
 
-// TODO: show error instead of default
-fn parse_duration_minutes(s: &str) -> Duration {
-    s.parse::<u64>()
-        .map(|m| Duration::from_secs(m * 60))
-        .unwrap_or(Duration::from_secs(25 * 60))
-}
-
-fn parse_path(s: &str) -> Option<std::path::PathBuf> {
-    if s.is_empty() {
-        None
-    } else {
-        Some(std::path::PathBuf::from(s))
+    fn parse_path(&mut self, s: impl AsRef<str>) -> Option<PathBuf> {
+        let s = s.as_ref();
+        if s.is_empty() {
+            None
+        } else {
+            let path = PathBuf::from(s);
+            if !path.exists() {
+                self.show_toast("Path does not exist", ToastType::Warning);
+            }
+            Some(path)
+        }
     }
-}
 
-fn parse_volume(s: &str) -> Percentage {
-    if s.is_empty() {
-        Percentage::default()
-    } else {
-        Percentage::try_from(s).unwrap_or_default()
+    fn parse_dur(&mut self, s: impl AsRef<str>) -> Option<Duration> {
+        self.try_parse(s, |s| s.parse::<u64>(), "integer")
+            .map(|val| Duration::from_secs(val * 60))
+    }
+
+    fn parse_vol(&mut self, s: impl AsRef<str>) -> Option<Percentage> {
+        let s = s.as_ref();
+        if s.is_empty() {
+            Some(Percentage::default())
+        } else {
+            self.try_parse(s, |s| Percentage::try_from(s), "percent")
+        }
+    }
+
+    fn try_parse<T, E: std::fmt::Debug>(
+        &mut self,
+        s: impl AsRef<str>,
+        f: impl for<'a> FnOnce(&'a str) -> Result<T, E>,
+        label: &str,
+    ) -> Option<T> {
+        let s = s.as_ref();
+        f(s).map_err(|e| {
+            self.show_toast(
+                format!("Failed converting {s} to {label}: {e:?}"),
+                ToastType::Error,
+            );
+        })
+        .ok()
     }
 }
 
