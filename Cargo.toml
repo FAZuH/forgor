@@ -35,9 +35,5 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 tui-widgets = "0.7.2"
 
 [[bin]]
-path = "src/bin/sandbox.rs"
-name = "sandbox"
-
-[[bin]]
 path = "src/main.rs"
 name = "tomo"

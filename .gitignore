@@ -2,3 +2,4 @@
 /data/
 /.env
 /migrations/.diesel_lock
+/src/bin/sandbox.rs
