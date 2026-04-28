@@ -10,6 +10,10 @@ use tui_widgets::scrollview::ScrollbarVisibility;
 
 use crate::config::Config;
 use crate::config::pomodoro::Alarm;
+use crate::config::pomodoro::Alarms;
+use crate::config::pomodoro::Hooks;
+use crate::config::pomodoro::PomodoroConfig;
+use crate::config::pomodoro::Timers;
 use crate::ui::update::settings::SETTINGS_VIEW_ITEMS;
 
 pub struct TuiSettingsRenderer {
@@ -94,7 +98,7 @@ impl TuiSettingsRenderer {
         let content_width = area.width.saturating_sub(4).max(46);
 
         // Build sections with proper layout
-        let sections = self.build_sections(config);
+        let sections = self.build_sections(&config.pomodoro);
 
         // Calculate total height: title (4) + spacing (1) + sections + padding (2)
         let sections_height: u16 = sections.iter().map(|s| s.height).sum();
@@ -116,8 +120,8 @@ impl TuiSettingsRenderer {
         let mut y = 5u16; // Start after title + 1 row spacing
         for section in sections {
             let section_area = Rect::new(0, y, content_width, section.height);
-            self.render_section(&mut scroll_view, section_area, &section);
             y += section.height;
+            scroll_view.render_widget(section, section_area);
         }
 
         frame.render_stateful_widget(scroll_view, area, &mut self.scroll_state);
@@ -151,162 +155,126 @@ impl TuiSettingsRenderer {
     }
 
     /// Build sections from config, calculating layout and identifying editable items
-    fn build_sections(&self, config: &Config) -> Vec<Section> {
+    fn build_sections(&self, config: &PomodoroConfig) -> Vec<Section> {
         let mut sections = Vec::new();
         let mut item_idx = 0u32;
 
-        self.build_timer_section(config, &mut sections, &mut item_idx);
-        self.build_hooks_section(config, &mut sections, &mut item_idx);
-        self.build_alarm_section(config, &mut sections, &mut item_idx);
+        self.build_timer_section(&config.timer, &mut sections, &mut item_idx);
+        self.build_hooks_section(&config.hook, &mut sections, &mut item_idx);
+        self.build_alarm_section(&config.alarm, &mut sections, &mut item_idx);
 
         sections
     }
 
     fn build_timer_section(
         &self,
-        config: &Config,
+        config: &Timers,
         sections: &mut Vec<Section>,
         item_idx: &mut u32,
     ) {
         // Build Pomodoro Timer section
-        let timer_label = "󰔛 Pomodoro Timer";
-        let timer_color = Self::section_color_from_label(timer_label);
-        let mut timer_rows = Vec::new();
+        let label = "󰔛 Pomodoro Timer";
+        let color = SectionColor::from_label(label);
+        let mut rows = Vec::new();
 
         // Durations subsection
-        if !timer_rows.is_empty() {
-            timer_rows.push(SectionRow::Blank);
+        if !rows.is_empty() {
+            rows.push(SectionRow::Blank);
         }
-        timer_rows.push(SectionRow::SubSectionHeader("Durations".to_string()));
+        rows.push(SectionRow::SubSectionHeader("Durations".to_string()));
         self.add_input_to_rows(
             "Focus",
-            format!("{}", config.pomodoro.timer.focus.as_secs() / 60),
-            &mut timer_rows,
+            format!("{}", config.focus.as_secs() / 60),
+            &mut rows,
             item_idx,
         );
         self.add_input_to_rows(
             "Short Break",
-            format!("{}", config.pomodoro.timer.short.as_secs() / 60),
-            &mut timer_rows,
+            format!("{}", config.short.as_secs() / 60),
+            &mut rows,
             item_idx,
         );
         self.add_input_to_rows(
             "Long Break",
-            format!("{}", config.pomodoro.timer.long.as_secs() / 60),
-            &mut timer_rows,
+            format!("{}", config.long.as_secs() / 60),
+            &mut rows,
             item_idx,
         );
 
         self.add_input_to_rows(
             "Long Break Interval",
-            format!("{}", config.pomodoro.timer.long_interval),
-            &mut timer_rows,
+            format!("{}", config.long_interval),
+            &mut rows,
             item_idx,
         );
 
         // Auto Start subsection
-        if !timer_rows.is_empty() {
-            timer_rows.push(SectionRow::Blank);
+        if !rows.is_empty() {
+            rows.push(SectionRow::Blank);
         }
-        timer_rows.push(SectionRow::SubSectionHeader("Auto Start".to_string()));
-        self.add_checkbox_to_rows(
-            "Focus",
-            config.pomodoro.timer.auto_focus,
-            &mut timer_rows,
-            item_idx,
-        );
-        self.add_checkbox_to_rows(
-            "Short Break",
-            config.pomodoro.timer.auto_short,
-            &mut timer_rows,
-            item_idx,
-        );
-        self.add_checkbox_to_rows(
-            "Long Break",
-            config.pomodoro.timer.auto_long,
-            &mut timer_rows,
-            item_idx,
-        );
+        rows.push(SectionRow::SubSectionHeader("Auto Start".to_string()));
+        self.add_checkbox_to_rows("Focus", config.auto_focus, &mut rows, item_idx);
+        self.add_checkbox_to_rows("Short Break", config.auto_short, &mut rows, item_idx);
+        self.add_checkbox_to_rows("Long Break", config.auto_long, &mut rows, item_idx);
 
-        let timer_height = 2 + timer_rows.iter().map(|r| r.height()).sum::<u16>();
+        let height = 2 + rows.iter().map(|r| r.height()).sum::<u16>();
         sections.push(Section {
-            title: timer_label.to_string(),
-            color: timer_color,
-            height: timer_height,
-            rows: timer_rows,
+            title: label.to_string(),
+            color,
+            height,
+            rows,
         });
     }
 
-    fn build_hooks_section(
-        &self,
-        config: &Config,
-        sections: &mut Vec<Section>,
-        item_idx: &mut u32,
-    ) {
+    fn build_hooks_section(&self, config: &Hooks, sections: &mut Vec<Section>, item_idx: &mut u32) {
         // Build Command Hooks section
-        let hooks_label = "󰛢 Command Hooks";
-        let hooks_color = Self::section_color_from_label(hooks_label);
-        let mut hooks_rows = Vec::new();
+        let label = "󰛢 Command Hooks";
+        let color = SectionColor::from_label(label);
+        let mut rows = Vec::new();
 
         // Hooks subsection
-        if !hooks_rows.is_empty() {
-            hooks_rows.push(SectionRow::Blank);
+        if !rows.is_empty() {
+            rows.push(SectionRow::Blank);
         }
-        hooks_rows.push(SectionRow::SubSectionHeader("Hooks".to_string()));
-        self.add_input_to_rows(
-            "Focus",
-            &config.pomodoro.hook.focus,
-            &mut hooks_rows,
-            item_idx,
-        );
-        self.add_input_to_rows(
-            "Short Break",
-            &config.pomodoro.hook.short,
-            &mut hooks_rows,
-            item_idx,
-        );
-        self.add_input_to_rows(
-            "Long Break",
-            &config.pomodoro.hook.long,
-            &mut hooks_rows,
-            item_idx,
-        );
+        rows.push(SectionRow::SubSectionHeader("Hooks".to_string()));
+        self.add_input_to_rows("Focus", &config.focus, &mut rows, item_idx);
+        self.add_input_to_rows("Short Break", &config.short, &mut rows, item_idx);
+        self.add_input_to_rows("Long Break", &config.long, &mut rows, item_idx);
 
-        let hooks_height = 2 + hooks_rows.iter().map(|r| r.height()).sum::<u16>();
+        let height = 2 + rows.iter().map(|r| r.height()).sum::<u16>();
         sections.push(Section {
-            title: hooks_label.to_string(),
-            color: hooks_color,
-            height: hooks_height,
-            rows: hooks_rows,
+            title: label.to_string(),
+            color,
+            height,
+            rows,
         });
     }
 
     fn build_alarm_section(
         &self,
-        config: &Config,
+        config: &Alarms,
         sections: &mut Vec<Section>,
         item_idx: &mut u32,
     ) {
-        let alarm = &config.pomodoro.alarm;
         let mut rows = Vec::new();
 
         // Alarm Files subsection
         rows.push(SectionRow::SubSectionHeader("Alarm Files".to_string()));
         self.add_input_to_rows(
             "Focus",
-            Self::get_alarm_path_value(&alarm.focus),
+            get_alarm_path_value(&config.focus),
             &mut rows,
             item_idx,
         );
         self.add_input_to_rows(
             "Short Break",
-            Self::get_alarm_path_value(&alarm.short),
+            get_alarm_path_value(&config.short),
             &mut rows,
             item_idx,
         );
         self.add_input_to_rows(
             "Long Break",
-            Self::get_alarm_path_value(&alarm.long),
+            get_alarm_path_value(&config.long),
             &mut rows,
             item_idx,
         );
@@ -316,19 +284,19 @@ impl TuiSettingsRenderer {
         rows.push(SectionRow::SubSectionHeader("Alarm Volumes".to_string()));
         self.add_input_to_rows(
             "Focus",
-            Self::get_alarm_volume_value(&alarm.focus),
+            get_alarm_volume_value(&config.focus),
             &mut rows,
             item_idx,
         );
         self.add_input_to_rows(
             "Short Break",
-            Self::get_alarm_volume_value(&alarm.short),
+            get_alarm_volume_value(&config.short),
             &mut rows,
             item_idx,
         );
         self.add_input_to_rows(
             "Long Break",
-            Self::get_alarm_volume_value(&alarm.long),
+            get_alarm_volume_value(&config.long),
             &mut rows,
             item_idx,
         );
@@ -340,30 +308,6 @@ impl TuiSettingsRenderer {
             height,
             rows,
         });
-    }
-
-    fn get_alarm_path_value(alarm: &Alarm) -> String {
-        alarm
-            .path
-            .as_ref()
-            .map(|p| p.display().to_string())
-            .unwrap_or_default()
-    }
-
-    fn get_alarm_volume_value(alarm: &Alarm) -> String {
-        alarm.volume.to_string()
-    }
-
-    fn section_color_from_label(label: &str) -> SectionColor {
-        if label.contains("Timer") {
-            SectionColor::Timer
-        } else if label.contains("Hook") {
-            SectionColor::Hooks
-        } else if label.contains("Alarm") {
-            SectionColor::Alarm
-        } else {
-            SectionColor::Timer
-        }
     }
 
     fn add_input_to_rows(
@@ -378,11 +322,7 @@ impl TuiSettingsRenderer {
         let is_selected = self.selected_idx == idx;
         rows.push(SectionRow::Input {
             label: label.to_string(),
-            value: if is_selected && self.editing {
-                format!("{}█", self.edit_buffer)
-            } else {
-                value.to_string()
-            },
+            value: value.to_string(),
             is_selected,
         });
     }
@@ -404,99 +344,6 @@ impl TuiSettingsRenderer {
         });
     }
 
-    fn render_section(&self, scroll_view: &mut ScrollView, area: Rect, section: &Section) {
-        // Create block with border
-        let block = Block::default()
-            .title(section.title.clone())
-            .title_style(section.color.title_style())
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(section.color.border_color()));
-
-        // Render the block
-        scroll_view.render_widget(block.clone(), area);
-
-        // Get inner area for content
-        let inner = block.inner(area);
-        let inner = Rect::new(inner.x, inner.y, inner.width, inner.height);
-
-        // Render rows inside the block
-        let mut y = inner.y;
-        for row in &section.rows {
-            let row_height = row.height();
-            let row_area = Rect::new(inner.x, y, inner.width, row_height);
-            self.render_section_row(scroll_view, row_area, row);
-            y += row_height;
-        }
-    }
-
-    fn render_section_row(&self, scroll_view: &mut ScrollView, area: Rect, row: &SectionRow) {
-        match row {
-            SectionRow::Blank => {
-                // Nothing to render for blank rows
-            }
-            SectionRow::SubSectionHeader(label) => {
-                let line = Line::from(vec![Span::styled(
-                    format!("▸ {} ", label),
-                    Style::default()
-                        .fg(Color::White)
-                        .add_modifier(Modifier::BOLD)
-                        .add_modifier(Modifier::UNDERLINED),
-                )]);
-                let p = Paragraph::new(line);
-                scroll_view.render_widget(p, area);
-            }
-            SectionRow::Input {
-                label,
-                value,
-                is_selected,
-                ..
-            } => {
-                let selected_bg = if *is_selected {
-                    Style::default().bg(Color::DarkGray)
-                } else {
-                    Style::default()
-                };
-
-                let line = Line::from(vec![
-                    Span::styled(
-                        format!("{}: ", label),
-                        Style::default()
-                            .add_modifier(Modifier::DIM)
-                            .patch(selected_bg),
-                    ),
-                    Span::styled(value, Style::default().patch(selected_bg)),
-                ]);
-                let p = Paragraph::new(line);
-                scroll_view.render_widget(p, area);
-            }
-            SectionRow::Checkbox {
-                label,
-                value,
-                is_selected,
-                ..
-            } => {
-                let selected_bg = if *is_selected {
-                    Style::default().bg(Color::DarkGray)
-                } else {
-                    Style::default()
-                };
-
-                let checkbox = if *value {
-                    Span::styled("[x]", Style::default().fg(Color::Cyan).patch(selected_bg))
-                } else {
-                    Span::styled("[ ]", Style::default().fg(Color::Cyan).patch(selected_bg))
-                };
-                let line = Line::from(vec![
-                    checkbox,
-                    Span::styled(" ", selected_bg),
-                    Span::styled(label.clone(), selected_bg),
-                ]);
-                let p = Paragraph::new(line);
-                scroll_view.render_widget(p, area);
-            }
-        }
-    }
-
     /// Scroll up by one row
     pub fn scroll_up(&mut self) {
         self.scroll_state.scroll_up();
@@ -509,6 +356,7 @@ impl TuiSettingsRenderer {
 }
 
 /// Represents a section with border
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct Section {
     title: String,
     color: SectionColor,
@@ -517,6 +365,7 @@ struct Section {
 }
 
 /// Individual row within a section
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum SectionRow {
     Blank,
     SubSectionHeader(String),
@@ -541,8 +390,103 @@ impl SectionRow {
     }
 }
 
+impl Widget for Section {
+    fn render(self, area: Rect, buf: &mut Buffer)
+    where
+        Self: Sized,
+    {
+        // Create block with border
+        let block = Block::default()
+            .title(self.title.clone())
+            .title_style(self.color.title_style())
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(self.color.border_color()));
+
+        // Get inner area for content
+        let inner = block.inner(area);
+        let inner = Rect::new(inner.x, inner.y, inner.width, inner.height);
+
+        // Render the block
+        block.render(area, buf);
+
+        // Render rows inside the block
+        let mut y = inner.y;
+        for row in self.rows {
+            let row_height = row.height();
+            let row_area = Rect::new(inner.x, y, inner.width, row_height);
+            row.render(row_area, buf);
+            y += row_height;
+        }
+    }
+}
+
+impl Widget for SectionRow {
+    fn render(self, area: Rect, buf: &mut Buffer)
+    where
+        Self: Sized,
+    {
+        match self {
+            SectionRow::Blank => Line::from("").render(area, buf),
+            SectionRow::SubSectionHeader(label) => {
+                let line = Line::from(Span::styled(
+                    format!("▸ {} ", label),
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD)
+                        .add_modifier(Modifier::UNDERLINED),
+                ));
+                Paragraph::new(line).render(area, buf);
+            }
+            SectionRow::Input {
+                label,
+                value,
+                is_selected,
+            } => {
+                let bg = if is_selected {
+                    Style::default().bg(Color::DarkGray)
+                } else {
+                    Style::default()
+                };
+
+                let line = Line::from(vec![
+                    Span::styled(
+                        format!("{}: ", label),
+                        Style::default().add_modifier(Modifier::DIM).patch(bg),
+                    ),
+                    Span::styled(value, Style::default().patch(bg)),
+                ]);
+                Paragraph::new(line).render(area, buf);
+            }
+            SectionRow::Checkbox {
+                label,
+                value,
+                is_selected,
+            } => {
+                let bg = if is_selected {
+                    Style::default().bg(Color::DarkGray)
+                } else {
+                    Style::default()
+                };
+
+                let checkbox = if value {
+                    Span::styled("[x]", Style::default().fg(Color::Cyan).patch(bg))
+                } else {
+                    Span::styled("[ ]", Style::default().fg(Color::Cyan).patch(bg))
+                };
+
+                let line = Line::from(vec![
+                    checkbox,
+                    Span::styled(" ", bg),
+                    Span::styled(label.clone(), bg),
+                ]);
+                Paragraph::new(line).render(area, buf);
+            }
+        }
+    }
+}
+
 /// Section color scheme for visual distinction
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum SectionColor {
     Timer,
     Hooks,
@@ -563,4 +507,29 @@ impl SectionColor {
             .fg(self.border_color())
             .add_modifier(Modifier::BOLD)
     }
+
+    fn from_label(label: impl AsRef<str>) -> Self {
+        let label = label.as_ref();
+        if label.contains("Timer") {
+            SectionColor::Timer
+        } else if label.contains("Hook") {
+            SectionColor::Hooks
+        } else if label.contains("Alarm") {
+            SectionColor::Alarm
+        } else {
+            SectionColor::Timer
+        }
+    }
+}
+
+fn get_alarm_path_value(alarm: &Alarm) -> String {
+    alarm
+        .path
+        .as_ref()
+        .map(|p| p.display().to_string())
+        .unwrap_or_default()
+}
+
+fn get_alarm_volume_value(alarm: &Alarm) -> String {
+    alarm.volume.to_string()
 }
