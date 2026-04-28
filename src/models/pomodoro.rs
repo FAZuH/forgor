@@ -266,7 +266,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_next_state_focus() {
+    fn next_state_focus() {
         let mut pomo = Pomodoro {
             state: ShortBreak,
             ..Default::default()
@@ -278,7 +278,7 @@ mod tests {
     }
 
     #[test]
-    fn test_next_state_short_break() {
+    fn next_state_short_break() {
         let mut pomo = Pomodoro::default();
 
         assert_eq!(pomo.next_state(), ShortBreak);
@@ -287,7 +287,7 @@ mod tests {
     }
 
     #[test]
-    fn test_next_state_long_break() {
+    fn next_state_long_break() {
         let mut pomo = Pomodoro::default();
 
         // Short break
@@ -306,7 +306,7 @@ mod tests {
     }
 
     #[test]
-    fn test_running_checks() {
+    fn running_checks() {
         let mut pomo = Pomodoro {
             running: false,
             ..Default::default()
@@ -322,7 +322,7 @@ mod tests {
     }
 
     #[test]
-    fn test_skip() {
+    fn skip() {
         let mut pomo = Pomodoro {
             focus_sessions: 1,
             total_sessions: 1,
@@ -345,7 +345,7 @@ mod tests {
     }
 
     #[test]
-    fn test_session_counts() {
+    fn session_counts() {
         // 0 0
         let mut pomo = Pomodoro {
             focus_sessions: 0,
@@ -368,7 +368,7 @@ mod tests {
     }
 
     #[test]
-    fn test_pause_resume() {
+    fn pause_resume() {
         let mut pomo = Pomodoro::default();
 
         pomo.start().unwrap();
@@ -383,7 +383,7 @@ mod tests {
     }
 
     #[test]
-    fn test_add() {
+    fn add() {
         let mut pomo = Pomodoro {
             frozen_remaining: Duration::from_secs(67),
             running: false,
@@ -398,7 +398,7 @@ mod tests {
     }
 
     #[test]
-    fn test_update() {
+    fn update() {
         let past = Instant::now().checked_sub(Duration::from_secs(1)).unwrap();
 
         let pomo = Pomodoro {
@@ -418,7 +418,7 @@ mod tests {
     }
 
     #[test]
-    fn test_pause_resume_accumulates_total_time() {
+    fn pause_resume_accumulates_total_time() {
         let mut pomo = Pomodoro::default();
         pomo.start().unwrap();
 

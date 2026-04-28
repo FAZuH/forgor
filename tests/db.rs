@@ -20,7 +20,7 @@ type Conn<'a> = &'a mut SqliteConnection;
 type DbResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
 
 #[test]
-fn test_insert_project() {
+fn insert_project() {
     use projects::*;
     let conn = &mut conn();
     let (r1, r2) = insert_projects(conn).unwrap();
@@ -32,7 +32,7 @@ fn test_insert_project() {
 }
 
 #[test]
-fn test_insert_tags() {
+fn insert_tags() {
     use tags::*;
     let conn = &mut conn();
     let (r1, r2) = insert_tags(conn).unwrap();
@@ -44,7 +44,7 @@ fn test_insert_tags() {
 }
 
 #[test]
-fn test_insert_tasks() {
+fn insert_tasks() {
     use tasks::*;
     let conn = &mut conn();
     let (r1, r2, r3, r4) = insert_tasks(conn, 1, 2).unwrap();
@@ -58,7 +58,7 @@ fn test_insert_tasks() {
 }
 
 #[test]
-fn test_insert_sessions() {
+fn insert_sessions() {
     use sessions::*;
     let conn = &mut conn();
     let (r1, r2) = insert_sessions(conn, 1, 2).unwrap();
@@ -70,7 +70,7 @@ fn test_insert_sessions() {
 }
 
 #[test]
-fn test_insert_task_tags() {
+fn insert_task_tags() {
     use task_tags::*;
     let conn = &mut conn();
     let (r1, r2, r3) = insert_task_tags(conn, 1, 2, 3, 4).unwrap();
@@ -83,7 +83,7 @@ fn test_insert_task_tags() {
 }
 
 #[test]
-fn test_insert_project_default_tags() {
+fn insert_project_default_tags() {
     use project_default_tags::*;
     let conn = &mut conn();
     let (r1, r2) = insert_project_tags(conn, 1, 2, 3, 4).unwrap();
@@ -95,7 +95,7 @@ fn test_insert_project_default_tags() {
 }
 
 #[test]
-fn test_task_many_sessions() {
+fn task_many_sessions() {
     let conn = &mut conn();
     let (task, _, _, _) = insert_tasks(conn, 1, 2).unwrap();
     let (ses1, ses2) = insert_sessions(conn, task.id, task.id).unwrap();
@@ -111,7 +111,7 @@ fn test_task_many_sessions() {
 }
 
 #[test]
-fn test_task_many_tasks() {
+fn task_many_tasks() {
     let conn = &mut conn();
     let parent = new_task(conn, "Parent", None, None).unwrap();
     let subtask1 = new_task(conn, "Subtask1", None, Some(parent.id)).unwrap();
@@ -130,7 +130,7 @@ fn test_task_many_tasks() {
 }
 
 #[test]
-fn test_project_many_tasks() {
+fn project_many_tasks() {
     let conn = &mut conn();
     let proj = new_project(conn, "Project").unwrap();
     let task1 = new_task(conn, "Task1", Some(proj.id), None).unwrap();
@@ -149,7 +149,7 @@ fn test_project_many_tasks() {
 }
 
 #[test]
-fn test_task_many_tags() {
+fn task_many_tags() {
     let conn = &mut conn();
     let software = new_tag(conn, "software").unwrap();
     let academic = new_tag(conn, "academic").unwrap();
@@ -173,7 +173,7 @@ fn test_task_many_tags() {
 }
 
 #[test]
-fn test_tag_many_tasks() {
+fn tag_many_tasks() {
     let conn = &mut conn();
     let software = new_tag(conn, "software").unwrap();
     let task1 = new_task(conn, "Add db feature", None, None).unwrap();
@@ -197,7 +197,7 @@ fn test_tag_many_tasks() {
 }
 
 #[test]
-fn test_project_many_default_tags() {
+fn project_many_default_tags() {
     let conn = &mut conn();
     let tomo = new_project(conn, "tomo").unwrap();
     let software = new_tag(conn, "software").unwrap();
@@ -221,7 +221,7 @@ fn test_project_many_default_tags() {
 }
 
 #[test]
-fn test_tag_many_default_projects() {
+fn tag_many_default_projects() {
     let conn = &mut conn();
     let tomo = new_project(conn, "tomo").unwrap();
     let college = new_project(conn, "college").unwrap();
