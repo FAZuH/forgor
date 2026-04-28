@@ -1,5 +1,6 @@
-pub mod input;
+pub mod backend;
 pub mod renderer;
+pub mod toasts;
 pub mod view;
 
 pub use view::TuiView;
@@ -9,6 +10,6 @@ pub enum TuiError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
-    #[error("Error during initialization: {0}")]
+    #[error("error during initialization: {0}")]
     InitializeError(String),
 }

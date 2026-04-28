@@ -1,7 +1,7 @@
 use std::time::Duration;
 use std::time::Instant;
 
-use PomodoroState::*;
+use State::*;
 
 #[derive(Clone, Debug)]
 pub struct Pomodoro {
@@ -20,7 +20,7 @@ pub struct Pomodoro {
 
     // Session data
     running: bool,
-    state: PomodoroState,
+    state: State,
 
     /// Anchor instant for the current running segment.
     /// Always set when running, None when paused.
@@ -117,7 +117,7 @@ impl Pomodoro {
         self.reset_time();
     }
 
-    pub fn state(&self) -> PomodoroState {
+    pub fn state(&self) -> State {
         self.state
     }
 
@@ -172,7 +172,7 @@ impl Pomodoro {
     }
 
     /// Gets the next state after this state.
-    pub fn next_state(&self) -> PomodoroState {
+    pub fn next_state(&self) -> State {
         match self.state {
             Focus => {
                 if (self.focus_sessions + 1).is_multiple_of(self.long_interval) {
@@ -217,7 +217,7 @@ impl Pomodoro {
 impl Default for Pomodoro {
     fn default() -> Self {
         Self {
-            state: PomodoroState::Focus,
+            state: State::Focus,
             focus: Duration::from_mins(25),
             long_break: Duration::from_mins(15),
             short_break: Duration::from_mins(5),
@@ -233,13 +233,13 @@ impl Default for Pomodoro {
 }
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
-pub enum PomodoroState {
+pub enum State {
     Focus,
     LongBreak,
     ShortBreak,
 }
 
-impl std::fmt::Display for PomodoroState {
+impl std::fmt::Display for State {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Focus => write!(f, "Focus"),
@@ -266,7 +266,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_next_state_focus() {
+    fn next_state_focus() {
         let mut pomo = Pomodoro {
             state: ShortBreak,
             ..Default::default()
@@ -278,7 +278,7 @@ mod tests {
     }
 
     #[test]
-    fn test_next_state_short_break() {
+    fn next_state_short_break() {
         let mut pomo = Pomodoro::default();
 
         assert_eq!(pomo.next_state(), ShortBreak);
@@ -287,7 +287,7 @@ mod tests {
     }
 
     #[test]
-    fn test_next_state_long_break() {
+    fn next_state_long_break() {
         let mut pomo = Pomodoro::default();
 
         // Short break
@@ -306,7 +306,7 @@ mod tests {
     }
 
     #[test]
-    fn test_running_checks() {
+    fn running_checks() {
         let mut pomo = Pomodoro {
             running: false,
             ..Default::default()
@@ -322,7 +322,7 @@ mod tests {
     }
 
     #[test]
-    fn test_skip() {
+    fn skip() {
         let mut pomo = Pomodoro {
             focus_sessions: 1,
             total_sessions: 1,
@@ -345,7 +345,7 @@ mod tests {
     }
 
     #[test]
-    fn test_session_counts() {
+    fn session_counts() {
         // 0 0
         let mut pomo = Pomodoro {
             focus_sessions: 0,
@@ -368,7 +368,7 @@ mod tests {
     }
 
     #[test]
-    fn test_pause_resume() {
+    fn pause_resume() {
         let mut pomo = Pomodoro::default();
 
         pomo.start().unwrap();
@@ -383,7 +383,7 @@ mod tests {
     }
 
     #[test]
-    fn test_add() {
+    fn add() {
         let mut pomo = Pomodoro {
             frozen_remaining: Duration::from_secs(67),
             running: false,
@@ -398,7 +398,7 @@ mod tests {
     }
 
     #[test]
-    fn test_update() {
+    fn update() {
         let past = Instant::now().checked_sub(Duration::from_secs(1)).unwrap();
 
         let pomo = Pomodoro {
@@ -418,7 +418,7 @@ mod tests {
     }
 
     #[test]
-    fn test_pause_resume_accumulates_total_time() {
+    fn pause_resume_accumulates_total_time() {
         let mut pomo = Pomodoro::default();
         pomo.start().unwrap();
 

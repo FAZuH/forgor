@@ -1,14 +1,14 @@
 use std::fs::File;
 use std::thread::JoinHandle;
 
+use log::info;
 use rodio::Decoder;
 use rodio::DeviceSinkBuilder;
 use rodio::Player;
-use tracing::info;
 
-use crate::config::Alarm;
-use crate::config::PomodoroAlarmConfig;
-use crate::models::pomodoro::PomodoroState;
+use crate::config::pomodoro::Alarm;
+use crate::config::pomodoro::Alarms;
+use crate::models::pomodoro::State;
 use crate::services::SoundError;
 use crate::services::SoundService;
 
@@ -16,27 +16,27 @@ pub struct AlarmService {
     focus: Alarm,
     long: Alarm,
     short: Alarm,
-    state: Option<PomodoroState>,
+    state: Option<State>,
 
     sound_thread: Option<JoinHandle<()>>,
 }
 
 impl AlarmService {
-    pub fn new(conf: &PomodoroAlarmConfig) -> Self {
+    pub fn new(conf: Alarms) -> Self {
         Self {
-            focus: conf.focus.clone(),
-            long: conf.long.clone(),
-            short: conf.short.clone(),
+            focus: conf.focus,
+            long: conf.long,
+            short: conf.short,
             state: None,
             sound_thread: None,
         }
     }
 
-    pub fn set_state(&mut self, state: PomodoroState) {
+    pub fn set_state(&mut self, state: State) {
         self.state = Some(state);
     }
 
-    pub fn set_sounds(&mut self, conf: &PomodoroAlarmConfig) {
+    pub fn set_sounds(&mut self, conf: &Alarms) {
         self.focus = conf.focus.clone();
         self.long = conf.long.clone();
         self.short = conf.short.clone();
@@ -44,7 +44,7 @@ impl AlarmService {
 }
 
 impl SoundService for AlarmService {
-    type SoundType = PomodoroState;
+    type SoundType = State;
 
     fn play(&mut self) -> Result<(), SoundError> {
         let state = match self.state {
@@ -53,9 +53,9 @@ impl SoundService for AlarmService {
         };
 
         let alarm = match state {
-            PomodoroState::Focus => &self.focus,
-            PomodoroState::LongBreak => &self.long,
-            PomodoroState::ShortBreak => &self.short,
+            State::Focus => &self.focus,
+            State::LongBreak => &self.long,
+            State::ShortBreak => &self.short,
         };
         if let Some(path) = &alarm.path
             && let Ok(file) = File::open(path)
@@ -81,7 +81,7 @@ impl SoundService for AlarmService {
     }
 
     fn is_playing(&self) -> bool {
-        !self.sound_thread.is_none()
+        self.sound_thread.is_some()
     }
 
     fn sleep_until_end(&mut self) {

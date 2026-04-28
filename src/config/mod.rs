@@ -1,14 +1,14 @@
+pub mod pomodoro;
+
 use std::fs;
 use std::path::PathBuf;
-use std::time::Duration;
 
+use log::debug;
+use log::info;
 use serde::Deserialize;
-use serde::Deserializer;
 use serde::Serialize;
-use serde::Serializer;
-use tracing::debug;
-use tracing::info;
 
+use crate::config::pomodoro::PomodoroConfig;
 use crate::utils;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -60,87 +60,6 @@ impl Config {
         info!("Configuration saved successfully");
         Ok(())
     }
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
-#[serde(default)]
-pub struct PomodoroConfig {
-    pub timer: PomodoroTimerConfig,
-    pub hook: PomodoroHookConfig,
-    pub alarm: PomodoroAlarmConfig,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(default)]
-pub struct PomodoroTimerConfig {
-    #[serde(with = "duration_as_secs")]
-    pub focus: Duration,
-    #[serde(with = "duration_as_secs")]
-    pub short: Duration,
-    #[serde(with = "duration_as_secs")]
-    pub long: Duration,
-
-    pub long_interval: u32,
-
-    pub auto_focus: bool,
-    pub auto_short: bool,
-    pub auto_long: bool,
-}
-
-mod duration_as_secs {
-    use super::*;
-
-    pub fn serialize<S>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_u64(duration.as_secs())
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Duration, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let secs = u64::deserialize(deserializer)?;
-        Ok(Duration::from_secs(secs))
-    }
-}
-
-impl Default for PomodoroTimerConfig {
-    fn default() -> Self {
-        Self {
-            focus: Duration::from_mins(25),
-            short: Duration::from_mins(5),
-            long: Duration::from_mins(10),
-            long_interval: 4,
-            auto_focus: false,
-            auto_short: false,
-            auto_long: false,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
-#[serde(default)]
-pub struct PomodoroHookConfig {
-    pub focus: String,
-    pub short: String,
-    pub long: String,
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
-#[serde(default)]
-pub struct PomodoroAlarmConfig {
-    pub focus: Alarm,
-    pub short: Alarm,
-    pub long: Alarm,
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
-#[serde(default)]
-pub struct Alarm {
-    pub path: Option<PathBuf>,
-    pub volume: Percentage,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, PartialOrd)]

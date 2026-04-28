@@ -1,16 +1,16 @@
-use crate::config::PomodoroHookConfig;
-use crate::models::pomodoro::PomodoroState;
+use crate::config::pomodoro::Hooks;
+use crate::models::pomodoro::State;
 
-pub fn run_cmds(conf: &PomodoroHookConfig, state: PomodoroState) {
+pub fn run_cmds(conf: &Hooks, state: State) {
     let cmd = match state {
-        PomodoroState::Focus => conf.focus.clone(),
-        PomodoroState::LongBreak => conf.long.clone(),
-        PomodoroState::ShortBreak => conf.short.clone(),
+        State::Focus => conf.focus.clone(),
+        State::LongBreak => conf.long.clone(),
+        State::ShortBreak => conf.short.clone(),
     };
 
     std::thread::spawn(move || {
         let Some(parts) = shlex::split(&cmd) else {
-            tracing::error!("failed to parse hook command: {}", cmd);
+            log::error!("failed to parse hook command: {}", cmd);
             return;
         };
         let mut parts = parts.into_iter();
