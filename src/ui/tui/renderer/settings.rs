@@ -28,7 +28,7 @@ use crate::ui::update::settings::SETTINGS_VIEW_ITEMS;
 pub struct TuiSettingsRenderer {
     scroll_state: ScrollViewState,
     selected_idx: u32,
-    pub prompt: Option<SettingsPrompt>,
+    prompt: Option<SettingsPrompt>,
     has_unsaved_changes: bool,
 }
 
