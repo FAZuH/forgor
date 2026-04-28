@@ -8,8 +8,8 @@ use tui_widgets::scrollview::ScrollView;
 use tui_widgets::scrollview::ScrollViewState;
 use tui_widgets::scrollview::ScrollbarVisibility;
 
-use crate::config::Alarm;
 use crate::config::Config;
+use crate::config::pomodoro::Alarm;
 use crate::ui::pages::settings::SETTINGS_VIEW_ITEMS;
 
 pub struct TuiSettingsRenderer {

@@ -6,8 +6,8 @@ use rodio::Decoder;
 use rodio::DeviceSinkBuilder;
 use rodio::Player;
 
-use crate::config::Alarm;
-use crate::config::PomodoroAlarmConfig;
+use crate::config::pomodoro::Alarm;
+use crate::config::pomodoro::Alarms;
 use crate::models::pomodoro::PomodoroState;
 use crate::services::SoundError;
 use crate::services::SoundService;
@@ -22,7 +22,7 @@ pub struct AlarmService {
 }
 
 impl AlarmService {
-    pub fn new(conf: &PomodoroAlarmConfig) -> Self {
+    pub fn new(conf: &Alarms) -> Self {
         Self {
             focus: conf.focus.clone(),
             long: conf.long.clone(),
@@ -36,7 +36,7 @@ impl AlarmService {
         self.state = Some(state);
     }
 
-    pub fn set_sounds(&mut self, conf: &PomodoroAlarmConfig) {
+    pub fn set_sounds(&mut self, conf: &Alarms) {
         self.focus = conf.focus.clone();
         self.long = conf.long.clone();
         self.short = conf.short.clone();

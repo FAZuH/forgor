@@ -1,7 +1,7 @@
-use crate::config::PomodoroHookConfig;
+use crate::config::pomodoro::Hooks;
 use crate::models::pomodoro::PomodoroState;
 
-pub fn run_cmds(conf: &PomodoroHookConfig, state: PomodoroState) {
+pub fn run_cmds(conf: &Hooks, state: PomodoroState) {
     let cmd = match state {
         PomodoroState::Focus => conf.focus.clone(),
         PomodoroState::LongBreak => conf.long.clone(),
