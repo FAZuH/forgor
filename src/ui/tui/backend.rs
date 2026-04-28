@@ -2,6 +2,8 @@ use std::io::Stderr;
 use std::ops::Deref;
 use std::ops::DerefMut;
 
+use crossterm::event::DisableMouseCapture;
+use crossterm::event::EnableMouseCapture;
 use crossterm::execute;
 use crossterm::terminal::EnterAlternateScreen;
 use crossterm::terminal::LeaveAlternateScreen;
@@ -26,6 +28,7 @@ impl Tui {
         let mut backend = CrosstermBackend::new(buffer);
 
         execute!(backend, EnterAlternateScreen)?;
+        execute!(backend, EnableMouseCapture)?;
 
         crossterm::terminal::enable_raw_mode()?;
         let mut terminal = Terminal::new(backend)?;
@@ -35,6 +38,7 @@ impl Tui {
 
     fn cleanup(&mut self) -> Result<(), TuiError> {
         execute!(self.terminal.backend_mut(), LeaveAlternateScreen)?;
+        execute!(self.terminal.backend_mut(), DisableMouseCapture)?;
 
         crossterm::terminal::disable_raw_mode()?;
         Ok(())

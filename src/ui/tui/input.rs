@@ -1,7 +1,10 @@
 use crossterm::event::KeyCode;
 use crossterm::event::KeyEvent;
 use crossterm::event::KeyModifiers;
+use crossterm::event::MouseEvent;
+use crossterm::event::MouseEventKind;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Input {
     Up,
     Down,
@@ -13,6 +16,8 @@ pub enum Input {
     Char(char),
     Ctrl(char),
     Shift(char),
+    ScrollUp,
+    ScrollDown,
 }
 
 impl Input {
@@ -40,5 +45,13 @@ impl Input {
             _ => return None,
         };
         Some(ret)
+    }
+
+    pub fn from_mouseevent(mouse: MouseEvent) -> Option<Input> {
+        match mouse.kind {
+            MouseEventKind::ScrollUp => Some(Input::ScrollUp),
+            MouseEventKind::ScrollDown => Some(Input::ScrollDown),
+            _ => None,
+        }
     }
 }

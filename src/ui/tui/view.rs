@@ -95,6 +95,7 @@ impl TuiView {
         if event::poll(Duration::from_millis(10))? {
             match event::read()? {
                 Event::Key(key) => Ok(Input::from_keyevent(key)),
+                Event::Mouse(mouse) => Ok(Input::from_mouseevent(mouse)),
                 _ => Ok(None),
             }
         } else {
@@ -284,6 +285,8 @@ impl TuiView {
             }
             Esc => self.router.navigate(Navigation::GoTo(Page::Timer)),
             Char('q') => self.quit(),
+            ScrollDown => self.renderer.settings.scroll_down(),
+            ScrollUp => self.renderer.settings.scroll_up(),
             _ => {}
         }
 
