@@ -19,7 +19,7 @@ pub enum TimerCmd {
     None,
     PromptNextSession,
     NextSession,
-    ContinuedSession,
+    SessionContinued,
 }
 
 pub struct TimerUpdate {}
@@ -46,7 +46,7 @@ impl Update for TimerUpdate {
             ResetSession => model.reset(),
             NextState => {
                 model.skip();
-                cmd = TimerCmd::ContinuedSession;
+                cmd = TimerCmd::SessionContinued;
             }
             Tick { auto_next } => {
                 if model.remaining_time().is_zero() {

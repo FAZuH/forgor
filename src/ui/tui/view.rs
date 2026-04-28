@@ -20,7 +20,6 @@ use crate::services::SoundService;
 use crate::services::cmd_runner::run_cmds;
 use crate::services::notify::notify;
 use crate::ui::Update;
-use crate::ui::pages::settings::SettingsCmd;
 use crate::ui::pages::settings::SettingsMsg;
 use crate::ui::pages::settings::SettingsUpdate;
 use crate::ui::pages::timer::TimerCmd;
@@ -145,7 +144,7 @@ impl TuiView {
                 self.on_session_end();
                 self.next_session();
             }
-            TimerCmd::ContinuedSession => {}
+            TimerCmd::SessionContinued => {}
         }
     }
 
@@ -351,18 +350,9 @@ impl TuiView {
     }
 
     fn save_settings(&mut self) {
-        let (model, cmd) = SettingsUpdate::update(SettingsMsg::SaveToDisk, self.config.clone());
-        self.config = model;
-
-        if let SettingsCmd::SavedToDisk(res) = cmd {
-            match res {
-                Ok(_) => {
-                    self.renderer.settings.set_has_unsaved_changes(false);
-                    self.latest_config_save = self.config.clone();
-                }
-                Err(_) => res.unwrap(),
-            }
-        }
+        self.config.save().unwrap();
+        self.renderer.settings.set_has_unsaved_changes(false);
+        self.latest_config_save = self.config.clone();
     }
 
     // Compare current config with when it was latest saved.

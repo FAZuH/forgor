@@ -2,7 +2,6 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use crate::config::Config;
-use crate::config::ConfigError;
 use crate::config::Percentage;
 use crate::ui::Update;
 
@@ -31,8 +30,6 @@ pub enum SettingsMsg {
     AlarmVolumeFocus(Percentage),
     AlarmVolumeShort(Percentage),
     AlarmVolumeLong(Percentage),
-    // Other
-    SaveToDisk,
 }
 
 impl SettingsMsg {
@@ -44,7 +41,6 @@ impl SettingsMsg {
 #[derive(Debug)]
 pub enum SettingsCmd {
     None,
-    SavedToDisk(Result<(), ConfigError>),
 }
 
 pub struct SettingsUpdate {}
@@ -65,7 +61,7 @@ impl Update for SettingsUpdate {
         let timer = &mut model.pomodoro.timer;
         let hook = &mut model.pomodoro.hook;
         let alarm = &mut model.pomodoro.alarm;
-        let mut cmd = SettingsCmd::None;
+        let cmd = SettingsCmd::None;
         match msg {
             // Timer
             TimerFocus(d) => timer.focus = d,
@@ -83,7 +79,6 @@ impl Update for SettingsUpdate {
             AlarmPathFocus(p) => alarm.focus.path = p,
             AlarmPathShort(p) => alarm.short.path = p,
             AlarmPathLong(p) => alarm.long.path = p,
-            SaveToDisk => cmd = SettingsCmd::SavedToDisk(model.save()),
             AlarmVolumeFocus(v) => alarm.focus.volume = v,
             AlarmVolumeShort(v) => alarm.short.volume = v,
             AlarmVolumeLong(v) => alarm.long.volume = v,
