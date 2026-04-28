@@ -18,7 +18,7 @@ use crate::models::Pomodoro;
 use crate::models::pomodoro::PomodoroState;
 use crate::services::SoundService;
 use crate::services::cmd_runner::run_cmds;
-use crate::services::notify::notify_pomodoro;
+use crate::services::notify::notify;
 use crate::ui::Update;
 use crate::ui::pages::settings::SettingsCmd;
 use crate::ui::pages::settings::SettingsMsg;
@@ -161,7 +161,7 @@ impl TuiView {
     }
 
     fn send_notification(&self) {
-        notify_pomodoro(self.pomodoro.next_state());
+        notify(self.pomodoro.next_state()).unwrap();
     }
 
     fn play_sound(&mut self) {
