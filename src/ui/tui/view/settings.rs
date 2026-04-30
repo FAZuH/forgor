@@ -148,7 +148,6 @@ impl TuiSettingsView {
     ) {
         use SettingsItem::*;
         // Build Pomodoro Timer section
-        let label = "󰔛 Pomodoro Timer";
         let mut r = Vec::new();
 
         // Durations subsection
@@ -192,7 +191,7 @@ impl TuiSettingsView {
 
         let height = 2 + r.iter().map(|r| r.height()).sum::<u16>();
         sections.push(Section {
-            title: label.into(),
+            title: "[1] Pomodoro Timer".into(),
             section: SettingsSection::Timer,
             sel_item: model.selected(),
             height,
@@ -208,7 +207,6 @@ impl TuiSettingsView {
     ) {
         use SettingsItem::*;
         // Build Command Hooks section
-        let label = "󰛢 Command Hooks";
         let mut r = Vec::new();
 
         // Hooks subsection
@@ -222,7 +220,7 @@ impl TuiSettingsView {
 
         let height = 2 + r.iter().map(|r| r.height()).sum::<u16>();
         sections.push(Section {
-            title: label.into(),
+            title: "[2] Command Hooks".into(),
             section: SettingsSection::Hook,
             sel_item: model.selected(),
             height,
@@ -254,7 +252,7 @@ impl TuiSettingsView {
 
         let height = 2 + r.iter().map(|r| r.height()).sum::<u16>();
         sections.push(Section {
-            title: "󰕾 Alarm".into(),
+            title: "[3] Alarm".into(),
             section: SettingsSection::Alarm,
             sel_item: model.selected(),
             height,

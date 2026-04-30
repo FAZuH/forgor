@@ -18,6 +18,7 @@ pub enum SettingsMsg {
     SelectDown,
     SectionPrev,
     SectionNext,
+    SectionSelect(u32),
     ScrollUp,
     ScrollDown,
     // StartEditing(PomodoroConfig),
@@ -258,6 +259,7 @@ impl Updateable for SettingsModel {
             SelectDown => self.select_down(),
             SectionPrev => self.prev_section(),
             SectionNext => self.next_section(),
+            SectionSelect(idx) => self.select_section(SettingsSection::from_index(idx).unwrap()),
             ScrollUp => self.scroll_up(),
             ScrollDown => self.scroll_down(),
             CancelEditing => self.cancel_editing(),
@@ -378,6 +380,10 @@ impl SettingsModel {
         self.selected =
             SettingsItem::from_index(SettingsSection::from_index(idx).unwrap().item_begin_idx())
                 .unwrap();
+    }
+
+    fn select_section(&mut self, section: SettingsSection) {
+        self.selected = SettingsItem::from_index(section.item_begin_idx()).unwrap();
     }
 
     /// Scroll up by one row

@@ -284,6 +284,15 @@ impl TuiRunner {
                         self.settings_mut().start_editing_for_field(pomo)
                     }
                 }
+                Char('1') => {
+                    let _ = self.update_settings(SectionSelect(0));
+                }
+                Char('2') => {
+                    let _ = self.update_settings(SectionSelect(1));
+                }
+                Char('3') => {
+                    let _ = self.update_settings(SectionSelect(2));
+                }
                 Char('s') => self.save_settings(),
                 Char(' ') if self.settings().selected().is_toggle() => self.apply_settings_edit(),
                 Esc => self.router_mut().navigate(Page::Timer),
