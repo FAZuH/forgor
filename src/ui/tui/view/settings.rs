@@ -384,13 +384,21 @@ impl Widget for SectionRow {
         match self {
             SectionRow::Blank => Line::from("").render(area, buf),
             SectionRow::SubSectionHeader(label) => {
-                let line = Line::from(Span::styled(
-                    format!("▸ {} ", label),
-                    Style::default()
-                        .fg(Color::White)
-                        .add_modifier(Modifier::BOLD)
-                        .add_modifier(Modifier::UNDERLINED),
-                ));
+                let line = Line::from(vec![
+                    Span::styled(
+                        " ",
+                        Style::default()
+                            .fg(Color::White)
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                    Span::styled(
+                        format!("▸{label} "),
+                        Style::default()
+                            .fg(Color::White)
+                            .add_modifier(Modifier::BOLD)
+                            .add_modifier(Modifier::UNDERLINED),
+                    ),
+                ]);
                 Paragraph::new(line).render(area, buf);
             }
             SectionRow::Input {
@@ -406,7 +414,7 @@ impl Widget for SectionRow {
 
                 let line = Line::from(vec![
                     Span::styled(
-                        format!("{}: ", label),
+                        format!(" {label}: "),
                         Style::default().add_modifier(Modifier::DIM).patch(bg),
                     ),
                     Span::styled(value, Style::default().patch(bg)),
@@ -425,14 +433,14 @@ impl Widget for SectionRow {
                 };
 
                 let checkbox = if value {
-                    Span::styled("[x]", Style::default().fg(Color::Cyan).patch(bg))
+                    Span::styled(" [x]", Style::default().fg(Color::Cyan).patch(bg))
                 } else {
-                    Span::styled("[ ]", Style::default().fg(Color::Cyan).patch(bg))
+                    Span::styled(" [ ]", Style::default().fg(Color::Cyan).patch(bg))
                 };
 
                 let line = Line::from(vec![
                     checkbox,
-                    Span::styled(" ", bg),
+                    Span::styled("", bg),
                     Span::styled(label.clone(), bg),
                 ]);
                 Paragraph::new(line).render(area, buf);
