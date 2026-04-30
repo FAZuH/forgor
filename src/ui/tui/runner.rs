@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::ops::Deref;
 use std::ops::DerefMut;
 use std::path::PathBuf;
@@ -10,10 +9,6 @@ use crossterm::event::Event;
 use crossterm::event::KeyCode;
 use crossterm::event::MouseEventKind;
 use crossterm::event::{self};
-use ratatui::widgets::StatefulWidget;
-use ratatui::widgets::Widget;
-use ratatui_toaster::ToastBuilder;
-use ratatui_toaster::ToastPosition;
 use ratatui_toaster::ToastType;
 use tui_widgets::prompts::State as PromptState;
 use tui_widgets::prompts::Status;
@@ -31,9 +26,8 @@ use crate::ui::tui::model::SettingsModel;
 use crate::ui::tui::model::SettingsMsg;
 use crate::ui::tui::model::TimerModel;
 use crate::ui::tui::model::TimerMsg;
-use crate::ui::tui::toasts::ToastHandler;
-use crate::ui::tui::view::TuiRenderer;
 use crate::ui::tui::view::TuiState;
+use crate::ui::tui::view::TuiView;
 use crate::ui::tui::view::settings::SettingsState;
 use crate::ui::tui::view::timer::TimerState;
 use crate::ui::*;
@@ -45,10 +39,10 @@ pub struct TuiRunner {
     latest_config_save: Option<Config>,
 
     terminal: Tui,
+    view: TuiView,
 
     sound: Sound,
     tick: TickHandler,
-    toast: ToastHandler,
 }
 
 impl Runner for TuiRunner {
@@ -70,10 +64,10 @@ impl TuiRunner {
         Ok(Self {
             state,
             latest_config_save: None,
+            view: TuiView::new(),
             terminal,
             sound,
             tick: TickHandler::default(),
-            toast: ToastHandler::default(),
         })
     }
 
@@ -106,7 +100,7 @@ impl TuiRunner {
     }
 
     fn tick(&mut self) {
-        self.toast.tick();
+        self.view.toast.tick();
         let auto_next = self.should_auto_next();
         let cmd = self.update_pomo(PomodoroMsg::Tick { auto_next });
 
@@ -143,7 +137,7 @@ impl TuiRunner {
 
     fn send_notification(&mut self) {
         if let Err(e) = notify(self.pomo().next_mode()) {
-            self.show_toast(e.to_string(), ToastType::Error);
+            self.view.show_toast(e.to_string(), ToastType::Error);
         }
     }
 
@@ -151,17 +145,9 @@ impl TuiRunner {
         if !self.sound.is_playing() {
             self.sound.set_sound(self.pomo().next_mode());
             if let Err(e) = self.sound.play() {
-                self.show_toast(e.to_string(), ToastType::Error);
+                self.view.show_toast(e.to_string(), ToastType::Error);
             }
         }
-    }
-
-    fn show_toast(&mut self, message: impl Into<Cow<'static, str>>, r#type: ToastType) {
-        self.toast.show_toast(
-            ToastBuilder::new(message.into())
-                .toast_type(r#type)
-                .position(ToastPosition::TopRight),
-        );
     }
 
     fn transition(&mut self) {
@@ -179,10 +165,7 @@ impl TuiRunner {
 
     fn render_terminal(&mut self) -> Result<(), TuiError> {
         self.terminal.draw(|f| {
-            let area = f.area();
-            TuiRenderer::new().render(area, f.buffer_mut(), &mut self.state);
-            // self.toast.set_area(area);
-            self.toast.render(area, f.buffer_mut());
+            TuiView::new().render_stateful(f, &mut self.state);
         })?;
         Ok(())
     }
@@ -361,10 +344,11 @@ impl TuiRunner {
             Ok(()) => {
                 self.update_settings(SettingsMsg::SetUnsavedChanges(false));
                 self.snapshot_settings();
-                self.show_toast("Settings saved!", ToastType::Success);
+                self.view.show_toast("Settings saved!", ToastType::Success);
             }
             Err(e) => {
-                self.show_toast(format!("Failed to save: {e}"), ToastType::Error);
+                self.view
+                    .show_toast(format!("Failed to save: {e}"), ToastType::Error);
             }
         }
     }
@@ -395,7 +379,8 @@ impl TuiRunner {
         } else {
             let path = PathBuf::from(s);
             if !path.exists() {
-                self.show_toast("Path does not exist", ToastType::Warning);
+                self.view
+                    .show_toast("Path does not exist", ToastType::Warning);
             }
             Some(path)
         }
@@ -423,7 +408,7 @@ impl TuiRunner {
     ) -> Option<T> {
         let s = s.as_ref();
         f(s).map_err(|e| {
-            self.show_toast(
+            self.view.show_toast(
                 format!("Failed converting {s} to {label}: {e:?}"),
                 ToastType::Error,
             );

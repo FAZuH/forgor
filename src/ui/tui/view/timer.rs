@@ -11,15 +11,17 @@ use tui_widgets::popup::Popup;
 
 use crate::models::Pomodoro;
 use crate::models::pomodoro::Mode;
+use crate::ui::StatefulView;
 use crate::ui::tui::model::TimerModel;
 use crate::utils;
 
 type State = TimerState;
+type Canvas<'a> = (Rect, &'a mut Buffer);
 type Buf<'a> = &'a mut Buffer;
 
-pub struct TuiTimerRenderer {}
+pub struct TuiTimerView {}
 
-impl TuiTimerRenderer {
+impl TuiTimerView {
     pub fn new() -> Self {
         Self {}
     }
@@ -36,10 +38,12 @@ impl TimerState {
     }
 }
 
-impl StatefulWidget for TuiTimerRenderer {
+impl StatefulView<Canvas<'_>> for TuiTimerView {
     type State = State;
+    type Result = ();
 
-    fn render(self, area: Rect, buf: Buf, state: &mut State) {
+    fn render_stateful(&self, canvas: Canvas, state: &mut Self::State) -> Self::Result {
+        let (area, buf) = canvas;
         let TimerState { model, pomo } = state;
 
         let mode = pomo.mode();
@@ -64,7 +68,7 @@ impl StatefulWidget for TuiTimerRenderer {
     }
 }
 
-impl TuiTimerRenderer {
+impl TuiTimerView {
     // Render popup if prompt is active
     fn prompt(&self, area: Rect, buf: Buf, model: &TimerModel, pomo: &Pomodoro) {
         if model.prompt_transition() {

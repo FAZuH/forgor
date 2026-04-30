@@ -18,18 +18,13 @@ use crate::config::pomodoro::Alarms;
 use crate::config::pomodoro::Hooks;
 use crate::config::pomodoro::PomodoroConfig;
 use crate::config::pomodoro::Timers;
+use crate::ui::StatefulView;
 use crate::ui::tui::model::SettingsModel;
 
+type Canvas<'a, 'b> = &'a mut Frame<'b>;
 type State = SettingsState;
-type Buf<'a> = &'a mut Buffer;
 
-pub struct TuiSettingsRenderer {}
-
-impl TuiSettingsRenderer {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
+pub struct TuiSettingsView {}
 
 pub struct SettingsState {
     pub(super) model: SettingsModel,
@@ -42,10 +37,19 @@ impl SettingsState {
     }
 }
 
-impl StatefulWidget for TuiSettingsRenderer {
-    type State = State;
+impl TuiSettingsView {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
 
-    fn render(self, area: Rect, buf: Buf, state: &mut Self::State) {
+impl<'a> StatefulView<Canvas<'a, '_>> for TuiSettingsView {
+    type State = State;
+    type Result = ();
+
+    fn render_stateful(&self, canvas: Canvas<'a, '_>, state: &mut State) {
+        let area = canvas.area();
+        let buf = canvas.buffer_mut();
         let SettingsState { model, conf } = state;
 
         // Reserve space for scrollbar and padding
@@ -81,11 +85,11 @@ impl StatefulWidget for TuiSettingsRenderer {
         scroll_view.render(area, buf, model.scroll_state_mut());
 
         // Render prompt popup
-        self.prompt(area, buf, model);
+        self.prompt(canvas, area, model);
     }
 }
 
-impl TuiSettingsRenderer {
+impl TuiSettingsView {
     fn title(&self, scroll: &mut ScrollView, area: Rect) {
         scroll.render_widget(TITLE.clone(), area);
     }
@@ -96,9 +100,10 @@ impl TuiSettingsRenderer {
         }
     }
 
-    fn prompt(&self, area: Rect, buf: Buf, model: &mut SettingsModel) {
+    fn prompt(&self, frame: &mut Frame, area: Rect, model: &mut SettingsModel) {
         // Render prompt overlay
         if let Some(ref mut prompt) = model.prompt_state_mut() {
+            let buf = frame.buffer_mut();
             let popup_width = 50.min(area.width.saturating_sub(4));
             let popup_height = 3;
 
@@ -117,7 +122,7 @@ impl TuiSettingsRenderer {
             let inner = block.inner(popup_area);
             block.render(popup_area, buf);
 
-            TextPrompt::new(Cow::Borrowed("")).render(inner, buf, &mut prompt.text_state);
+            TextPrompt::new(Cow::Borrowed("")).draw(frame, inner, &mut prompt.text_state);
         }
     }
 

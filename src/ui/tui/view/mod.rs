@@ -1,11 +1,16 @@
 pub mod settings;
 pub mod timer;
 
+use std::borrow::Cow;
+
 use ratatui::prelude::*;
+use ratatui_toaster::ToastBuilder;
+use ratatui_toaster::ToastPosition;
+use ratatui_toaster::ToastType;
 pub use settings::SettingsState;
-pub use settings::TuiSettingsRenderer;
+pub use settings::TuiSettingsView;
 pub use timer::TimerState;
-pub use timer::TuiTimerRenderer;
+pub use timer::TuiTimerView;
 
 use crate::config::Config;
 use crate::models::Pomodoro;
@@ -13,6 +18,7 @@ use crate::ui::ConfigCmd;
 use crate::ui::ConfigMsg;
 use crate::ui::PomodoroCmd;
 use crate::ui::PomodoroMsg;
+use crate::ui::StatefulView;
 use crate::ui::Updateable as _;
 use crate::ui::router::Page;
 use crate::ui::router::Router;
@@ -22,26 +28,48 @@ use crate::ui::tui::model::SettingsMsg;
 use crate::ui::tui::model::TimerCmd;
 use crate::ui::tui::model::TimerModel;
 use crate::ui::tui::model::TimerMsg;
+use crate::ui::tui::toasts::ToastHandler;
 
-pub struct TuiRenderer {}
+type Canvas<'a, 'b> = &'a mut Frame<'b>;
+type State = TuiState;
 
-impl TuiRenderer {
-    pub fn new() -> Self {
-        Self {}
-    }
+pub struct TuiView {
+    pub toast: ToastHandler,
 }
 
-impl StatefulWidget for TuiRenderer {
-    type State = TuiState;
+impl TuiView {
+    pub fn new() -> Self {
+        Self {
+            toast: ToastHandler::default(),
+        }
+    }
 
-    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
+    pub fn show_toast(&mut self, message: impl Into<Cow<'static, str>>, r#type: ToastType) {
+        self.toast.show_toast(
+            ToastBuilder::new(message.into())
+                .toast_type(r#type)
+                .position(ToastPosition::TopRight),
+        );
+    }
+}
+impl<'a> StatefulView<Canvas<'a, '_>> for TuiView {
+    type State = State;
+    type Result = ();
+
+    fn render_stateful(&self, canvas: Canvas<'a, '_>, state: &mut State) {
+        let area = canvas.area();
+        let buf = canvas.buffer_mut();
         match state.router.active_page() {
-            Some(Page::Timer) => TuiTimerRenderer::new().render(area, buf, &mut state.timer),
+            Some(Page::Timer) => {
+                TuiTimerView::new().render_stateful_mut((area, buf), &mut state.timer)
+            }
             Some(Page::Settings) => {
-                TuiSettingsRenderer::new().render(area, buf, &mut state.settings)
+                TuiSettingsView::new().render_stateful_mut(canvas, &mut state.settings)
             }
             None => {}
         }
+        // toast and cursor after, buf borrow is done
+        canvas.render_widget(&*self.toast, canvas.area());
     }
 }
 
