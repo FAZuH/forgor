@@ -213,13 +213,13 @@ impl TuiRunner {
 
         if let Event::Key(key) = event {
             match key.code {
-                Left | Char('h') => {
+                Right | Char('l') => {
                     self.update_pomo(Subtract(Duration::from_secs(30)));
                 }
                 Down | Char('j') => {
                     self.update_pomo(Subtract(Duration::from_secs(60)));
                 }
-                Right | Char('l') => {
+                Left | Char('h') => {
                     self.update_pomo(Add(Duration::from_secs(30)));
                 }
                 Up | Char('k') => {
