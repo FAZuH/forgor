@@ -7,8 +7,8 @@ use crate::config::Config;
 use crate::models::pomodoro::Pomodoro;
 use crate::ui::router::Page;
 use crate::ui::router::Router;
-use crate::ui::tui::renderer::settings::TuiSettingsRenderer;
-use crate::ui::tui::renderer::timer::TuiTimerRenderer;
+use crate::ui::tui::view::settings::TuiSettingsRenderer;
+use crate::ui::tui::view::timer::TuiTimerRenderer;
 
 pub struct TuiRenderer {
     pub timer: TuiTimerRenderer,

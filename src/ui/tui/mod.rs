@@ -1,5 +1,5 @@
 pub mod backend;
-pub mod renderer;
+pub mod view;
 pub mod runner;
 pub mod toasts;
 
