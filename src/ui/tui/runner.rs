@@ -113,6 +113,7 @@ impl TuiRunner {
 
     fn render_terminal(&mut self) -> Result<(), TuiError> {
         self.terminal.draw(|f| {
+            self.toast.set_area(f.area());
             self.view.render_stateful_ref(f, &mut self.state);
             f.render_widget(&*self.toast, f.area());
         })?;
