@@ -432,16 +432,17 @@ impl Widget for SectionRow {
                     Style::default()
                 };
 
+                let style = Style::default().fg(Color::Cyan).patch(bg);
                 let checkbox = if value {
-                    Span::styled(" [x]", Style::default().fg(Color::Cyan).patch(bg))
+                    Span::styled(" [x] ", style)
                 } else {
-                    Span::styled(" [ ]", Style::default().fg(Color::Cyan).patch(bg))
+                    Span::styled(" [ ] ", style)
                 };
 
                 let line = Line::from(vec![
                     checkbox,
                     Span::styled("", bg),
-                    Span::styled(label.clone(), bg),
+                    Span::styled(label.clone(), bg).add_modifier(Modifier::DIM),
                 ]);
                 Paragraph::new(line).render(area, buf);
             }
