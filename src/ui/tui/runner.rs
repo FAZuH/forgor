@@ -166,6 +166,7 @@ impl TuiRunner {
         self.toast.show_toast(
             ToastBuilder::new(message.into())
                 .toast_type(r#type)
+                .deduplicate(true)
                 .position(ToastPosition::TopRight),
         );
     }
