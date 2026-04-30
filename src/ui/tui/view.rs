@@ -96,7 +96,8 @@ impl TuiView {
 
     fn tick(&mut self) {
         self.toast.tick();
-        let cmd = TimerUpdate::tick(self.should_auto_next(), self.timer_mut());
+        let auto_next = self.should_auto_next();
+        let cmd = self.update_timer(TimerMsg::Tick { auto_next });
 
         self.handle_timer_cmd(cmd);
     }
@@ -372,11 +373,11 @@ impl TuiView {
     }
 
     fn update_timer(&mut self, msg: TimerMsg) -> TimerCmd {
-        TimerUpdate::update(msg, self.timer_mut())
+        self.model.timer.update(msg)
     }
 
     fn update_settings(&mut self, msg: SettingsMsg) -> SettingsCmd {
-        SettingsUpdate::update(msg, self.settings_mut())
+        self.model.settings.update(msg)
     }
 
     fn timer(&self) -> &Pomodoro {
@@ -385,14 +386,6 @@ impl TuiView {
 
     fn settings(&self) -> &Config {
         &self.model.settings
-    }
-
-    fn timer_mut(&mut self) -> &mut Pomodoro {
-        &mut self.model.timer
-    }
-
-    fn settings_mut(&mut self) -> &mut Config {
-        &mut self.model.settings
     }
 
     fn parse_path(&mut self, s: impl AsRef<str>) -> Option<PathBuf> {

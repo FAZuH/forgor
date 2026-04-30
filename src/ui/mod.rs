@@ -9,11 +9,8 @@ pub use router::Router;
 pub use traits::*;
 pub use update::SettingsCmd;
 pub use update::SettingsMsg;
-pub use update::SettingsUpdate;
 pub use update::TimerCmd;
 pub use update::TimerMsg;
-pub use update::TimerUpdate;
-pub use update::Update;
 
 use crate::config::Config;
 use crate::models::Pomodoro;

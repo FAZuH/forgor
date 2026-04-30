@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use crate::models::Pomodoro;
-use crate::ui::Update;
 use crate::ui::Updateable;
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
@@ -23,15 +22,32 @@ pub enum TimerCmd {
     SessionContinued,
 }
 
-pub struct TimerUpdate {}
+impl Updateable for Pomodoro {
+    type Msg = TimerMsg;
+    type Cmd = TimerCmd;
 
-impl TimerUpdate {
-    pub fn new() -> Self {
-        Self {}
+    fn update(&mut self, msg: Self::Msg) -> Self::Cmd {
+        use TimerMsg::*;
+        let mut cmd = TimerCmd::None;
+        match msg {
+            Add(dur) => self.add(dur),
+            Subtract(dur) => self.subtract(dur),
+            TogglePause => self.toggle_pause(),
+            SkipSession => self.skip(),
+            ResetSession => self.reset(),
+            NextState => {
+                self.skip();
+                cmd = TimerCmd::SessionContinued;
+            }
+            Tick { auto_next } => cmd = self.tick(auto_next),
+        }
+        cmd
     }
+}
 
-    pub fn tick(auto_next: bool, model: &Pomodoro) -> TimerCmd {
-        if model.remaining_time().is_zero() {
+impl Pomodoro {
+    pub fn tick(&mut self, auto_next: bool) -> TimerCmd {
+        if self.remaining_time().is_zero() {
             if auto_next {
                 TimerCmd::NextSession
             } else {
@@ -40,38 +56,5 @@ impl TimerUpdate {
         } else {
             TimerCmd::None
         }
-    }
-}
-
-impl Update for TimerUpdate {
-    type Msg = TimerMsg;
-    type Model = Pomodoro;
-    type Cmd = TimerCmd;
-
-    fn update(msg: Self::Msg, model: &mut Self::Model) -> Self::Cmd {
-        use TimerMsg::*;
-        let mut cmd = TimerCmd::None;
-        match msg {
-            Add(dur) => model.add(dur),
-            Subtract(dur) => model.subtract(dur),
-            TogglePause => model.toggle_pause(),
-            SkipSession => model.skip(),
-            ResetSession => model.reset(),
-            NextState => {
-                model.skip();
-                cmd = TimerCmd::SessionContinued;
-            }
-            Tick { auto_next } => cmd = Self::tick(auto_next, model),
-        }
-        cmd
-    }
-}
-
-impl Updateable for Pomodoro {
-    type Msg = TimerMsg;
-    type Cmd = TimerCmd;
-
-    fn update(&mut self, msg: Self::Msg) -> Self::Cmd {
-        TimerUpdate::update(msg, self)
     }
 }

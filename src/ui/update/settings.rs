@@ -3,7 +3,6 @@ use std::time::Duration;
 
 use crate::config::Config;
 use crate::config::Percentage;
-use crate::ui::Update;
 use crate::ui::Updateable;
 
 pub const SETTINGS_VIEW_ITEMS: u32 = 16;
@@ -44,24 +43,15 @@ pub enum SettingsCmd {
     None,
 }
 
-pub struct SettingsUpdate {}
-
-impl SettingsUpdate {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl Update for SettingsUpdate {
+impl Updateable for Config {
     type Msg = SettingsMsg;
-    type Model = Config;
     type Cmd = SettingsCmd;
 
-    fn update(msg: Self::Msg, model: &mut Self::Model) -> Self::Cmd {
+    fn update(&mut self, msg: Self::Msg) -> Self::Cmd {
         use SettingsMsg::*;
-        let timer = &mut model.pomodoro.timer;
-        let hook = &mut model.pomodoro.hook;
-        let alarm = &mut model.pomodoro.alarm;
+        let timer = &mut self.pomodoro.timer;
+        let hook = &mut self.pomodoro.hook;
+        let alarm = &mut self.pomodoro.alarm;
         let cmd = SettingsCmd::None;
         match msg {
             // Timer
@@ -85,14 +75,5 @@ impl Update for SettingsUpdate {
             AlarmVolumeLong(v) => alarm.long.volume = v,
         }
         cmd
-    }
-}
-
-impl Updateable for Config {
-    type Msg = SettingsMsg;
-    type Cmd = SettingsCmd;
-
-    fn update(&mut self, msg: Self::Msg) -> Self::Cmd {
-        SettingsUpdate::update(msg, self)
     }
 }
