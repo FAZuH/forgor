@@ -329,7 +329,8 @@ impl SettingsModel {
         let alarm = &config.alarm;
         let hook = &config.hook;
         let timer = &config.timer;
-        let value = match self.selected.index() {
+        let idx = self.selected.index();
+        let mut value = match idx {
             0 => format!("{}", timer.focus.as_secs() / 60),
             1 => format!("{}", timer.short.as_secs() / 60),
             2 => format!("{}", timer.long.as_secs() / 60),
@@ -345,6 +346,10 @@ impl SettingsModel {
             15 => alarm.long.volume(),
             _ => return, // Cannot edit toggles or out of bounds
         };
+
+        if (13..=15).contains(&idx) {
+            value = value[..value.len() - 1].to_string();
+        }
 
         let value_len = value.len();
         let mut text_state = TextState::new()
