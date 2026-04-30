@@ -8,8 +8,6 @@ use ratatui::widgets::Block;
 use ratatui::widgets::Borders;
 use ratatui::widgets::Clear;
 use ratatui::widgets::Paragraph;
-use tui_widgets::big_text::BigText;
-use tui_widgets::big_text::PixelSize;
 use tui_widgets::prompts::prelude::*;
 use tui_widgets::scrollview::ScrollView;
 use tui_widgets::scrollview::ScrollbarVisibility;
@@ -56,31 +54,28 @@ impl<'a> StatefulViewRef<Canvas<'a, '_>> for TuiSettingsView {
         let SettingsState { model, conf } = state;
 
         // Reserve space for scrollbar and padding
-        let content_width = area.width.saturating_sub(4).max(46);
+        let content_width = area.width.saturating_sub(2).max(46);
 
         // Build sections with proper layout
         let sections = self.build_sections(model, &conf.pomodoro);
 
-        // Calculate total height: title (4) + spacing (1) + sections + padding (2)
-        let sections_height: u16 = sections.iter().map(|s| s.height).sum();
-        let total_height: u16 = 4 + 1 + sections_height + 2;
-
         // Create scroll view with full content size
-        let mut scroll_view = ScrollView::new(Size::new(content_width, total_height))
+        let mut scroll_view = ScrollView::new(Size::new(content_width, area.height))
             .vertical_scrollbar_visibility(ScrollbarVisibility::Automatic);
 
-        // Render title at top
-        let title_area = Rect::new(0, 0, content_width, 4);
-        self.title(&mut scroll_view, title_area);
-
         // Render unsaved changes indicator in the spacing row between title and sections
-        let indicator_area = Rect::new(0, 4, content_width, 1);
+        let indicator_area = Rect::new(0, 0, content_width, 1);
         self.save_indicator(&mut scroll_view, indicator_area, model);
 
         // Render sections with proper spacing
-        let mut y = 5u16; // Start after title + 1 row spacing
+        let mut y = 2u16;
+        let last = sections.last().unwrap().section;
         for section in sections {
-            let section_area = Rect::new(0, y, content_width, section.height);
+            let section_area = if section.section == last {
+                Rect::new(0, y, content_width, area.height)
+            } else {
+                Rect::new(0, y, content_width, section.height)
+            };
             y += section.height;
             scroll_view.render_widget(section, section_area);
         }
@@ -93,10 +88,6 @@ impl<'a> StatefulViewRef<Canvas<'a, '_>> for TuiSettingsView {
 }
 
 impl TuiSettingsView {
-    fn title(&self, scroll: &mut ScrollView, area: Rect) {
-        scroll.render_widget(TITLE.clone(), area);
-    }
-
     fn save_indicator(&self, scroll: &mut ScrollView, area: Rect, model: &mut SettingsModel) {
         if model.has_unsaved_changes() {
             scroll.render_widget(SAVED_INDICATOR.clone(), area);
@@ -439,19 +430,6 @@ pub struct SettingsPrompt {
     pub text_state: TextState<'static>,
     pub label: String,
 }
-
-static TITLE: LazyLock<BigText<'static>> = LazyLock::new(|| {
-    BigText::builder()
-        .pixel_size(PixelSize::Quadrant)
-        .style(
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        )
-        .lines(vec!["Settings".into()])
-        .centered()
-        .build()
-});
 
 static SAVED_INDICATOR: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
     Paragraph::new(Line::from(vec![Span::styled(
