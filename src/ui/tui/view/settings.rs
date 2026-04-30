@@ -20,8 +20,8 @@ use crate::config::pomodoro::PomodoroConfig;
 use crate::config::pomodoro::Timers;
 use crate::ui::StatefulViewRef;
 use crate::ui::tui::model::SettingsModel;
+use crate::ui::tui::view::Canvas;
 
-type Canvas<'a, 'b> = &'a mut Frame<'b>;
 type State = SettingsState;
 
 pub struct TuiSettingsView {}

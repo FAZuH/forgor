@@ -7,6 +7,7 @@ use tomo::models::Pomodoro;
 use tomo::services::alarm::AlarmService;
 use tomo::ui::Runner;
 use tomo::ui::tui::TuiRunner;
+use tomo::ui::tui::view::TuiView;
 
 #[tokio::main]
 async fn main() -> Result<(), AppError> {
@@ -25,7 +26,8 @@ async fn main() -> Result<(), AppError> {
 
 fn runner<'b>(conf: Config, pomo: Pomodoro) -> impl Runner + 'b {
     let sound = Box::new(AlarmService::new(conf.pomodoro.alarm.clone()));
-    TuiRunner::new(pomo, conf, sound).unwrap()
+    let view = TuiView::new();
+    TuiRunner::new(pomo, conf, view, sound).unwrap()
 }
 
 fn pomodoro(cli: &Cli, conf: &Config) -> Pomodoro {

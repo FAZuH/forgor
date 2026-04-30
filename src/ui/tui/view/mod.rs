@@ -1,12 +1,7 @@
 pub mod settings;
 pub mod timer;
 
-use std::borrow::Cow;
-
 use ratatui::prelude::*;
-use ratatui_toaster::ToastBuilder;
-use ratatui_toaster::ToastPosition;
-use ratatui_toaster::ToastType;
 pub use settings::SettingsState;
 pub use settings::TuiSettingsView;
 pub use timer::TimerState;
@@ -28,28 +23,21 @@ use crate::ui::tui::model::SettingsMsg;
 use crate::ui::tui::model::TimerCmd;
 use crate::ui::tui::model::TimerModel;
 use crate::ui::tui::model::TimerMsg;
-use crate::ui::tui::toasts::ToastHandler;
 
-type Canvas<'a, 'b> = &'a mut Frame<'b>;
+pub type Canvas<'a, 'b> = &'a mut Frame<'b>;
 type State = TuiState;
 
 pub struct TuiView {
-    pub toast: ToastHandler,
+    timer: TuiTimerView,
+    settings: TuiSettingsView,
 }
 
 impl TuiView {
     pub fn new() -> Self {
         Self {
-            toast: ToastHandler::default(),
+            timer: TuiTimerView::new(),
+            settings: TuiSettingsView::new(),
         }
-    }
-
-    pub fn show_toast(&mut self, message: impl Into<Cow<'static, str>>, r#type: ToastType) {
-        self.toast.show_toast(
-            ToastBuilder::new(message.into())
-                .toast_type(r#type)
-                .position(ToastPosition::TopRight),
-        );
     }
 }
 impl<'a> StatefulViewRef<Canvas<'a, '_>> for TuiView {
@@ -60,16 +48,14 @@ impl<'a> StatefulViewRef<Canvas<'a, '_>> for TuiView {
         let area = canvas.area();
         let buf = canvas.buffer_mut();
         match state.router.active_page() {
-            Some(Page::Timer) => {
-                TuiTimerView::new().render_stateful_mut((area, buf), &mut state.timer)
-            }
-            Some(Page::Settings) => {
-                TuiSettingsView::new().render_stateful_mut(canvas, &mut state.settings)
-            }
+            Some(Page::Timer) => self
+                .timer
+                .render_stateful_ref((area, buf), &mut state.timer),
+            Some(Page::Settings) => self
+                .settings
+                .render_stateful_ref(canvas, &mut state.settings),
             None => {}
         }
-        // toast and cursor after, buf borrow is done
-        canvas.render_widget(&*self.toast, canvas.area());
     }
 }
 
