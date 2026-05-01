@@ -37,14 +37,17 @@ use crate::ui::tui::view::settings::SettingsState;
 use crate::ui::tui::view::timer::TimerState;
 use crate::ui::*;
 
-type Sound = Box<dyn SoundService<SoundType = Mode>>;
+type Sound = Box<dyn SoundService<SoundType = Mode> + Send + Sync>;
+type View = Box<
+    dyn for<'a, 'b> StatefulViewRef<Canvas<'a, 'b>, State = TuiState, Result = ()> + Send + Sync,
+>;
 
 pub struct TuiRunner {
     state: TuiState,
     latest_config_save: Option<Config>,
 
     terminal: Tui,
-    view: Box<dyn for<'a, 'b> StatefulViewRef<Canvas<'a, 'b>, State = TuiState, Result = ()>>,
+    view: View,
 
     sound: Sound,
     toast: ToastHandler,
@@ -58,12 +61,7 @@ impl Runner for TuiRunner {
 }
 
 impl TuiRunner {
-    pub fn new(
-        pomo: Pomodoro,
-        conf: Config,
-        view: impl for<'a, 'b> StatefulViewRef<Canvas<'a, 'b>, State = TuiState, Result = ()> + 'static,
-        sound: Sound,
-    ) -> Result<Self, TuiError> {
+    pub fn new(pomo: Pomodoro, conf: Config, view: View, sound: Sound) -> Result<Self, TuiError> {
         let terminal = Tui::new()?;
 
         let state = TuiState::new(
@@ -76,7 +74,7 @@ impl TuiRunner {
             state,
             latest_config_save: None,
             terminal,
-            view: Box::new(view),
+            view,
             sound,
             toast: ToastHandler::default(),
             tick: TickHandler::default(),

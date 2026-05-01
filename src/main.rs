@@ -25,7 +25,7 @@ fn main() -> Result<(), AppError> {
 
 fn runner<'b>(conf: Config, pomo: Pomodoro) -> impl Runner + 'b {
     let sound = Box::new(AlarmService::new(conf.pomodoro.alarm.clone()));
-    let view = TuiView::new();
+    let view = Box::new(TuiView::new());
     TuiRunner::new(pomo, conf, view, sound).unwrap()
 }
 
