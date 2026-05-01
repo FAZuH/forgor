@@ -243,21 +243,14 @@ impl Default for Pomodoro {
     }
 }
 
-#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash, strum::Display)]
 pub enum Mode {
+    #[strum(to_string = "Focus")]
     Focus,
+    #[strum(to_string = "Long Break")]
     LongBreak,
+    #[strum(to_string = "Short Break")]
     ShortBreak,
-}
-
-impl std::fmt::Display for Mode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Focus => write!(f, "Focus"),
-            LongBreak => write!(f, "Long Break"),
-            ShortBreak => write!(f, "Short Break"),
-        }
-    }
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]

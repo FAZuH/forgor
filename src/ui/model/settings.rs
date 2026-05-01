@@ -1,5 +1,9 @@
 use std::fmt::Display;
 
+use strum::EnumCount;
+use strum::EnumMessage;
+use strum::FromRepr;
+use strum::IntoStaticStr;
 use tui_widgets::prompts::FocusState;
 use tui_widgets::prompts::State;
 use tui_widgets::prompts::TextState;
@@ -8,9 +12,6 @@ use tui_widgets::scrollview::ScrollViewState;
 use crate::config::pomodoro::PomodoroConfig;
 use crate::ui::prelude::*;
 use crate::ui::tui::view::settings::SettingsPrompt;
-use crate::ui::update::config::SETTINGS_VIEW_ITEMS;
-
-static SETTINGS_SECTIONS: u32 = 3;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SettingsMsg {
@@ -34,130 +35,21 @@ pub enum SettingsCmd {
     EditValue(Option<String>),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum SettingsItem {
-    // Timer settings
-    AutoStartOnLaunch,
-    TimerFocus,
-    TimerShort,
-    TimerLong,
-    TimerLongInterval,
-    // Toggles
-    TimerAutoFocus,
-    TimerAutoShort,
-    TimerAutoLong,
-
-    // Hook settings
-    HookFocus,
-    HookShort,
-    HookLong,
-
-    // Alarm path settings
-    AlarmPathFocus,
-    AlarmPathShort,
-    AlarmPathLong,
-    // Alarm volume settings
-    AlarmVolumeFocus,
-    AlarmVolumeShort,
-    AlarmVolumeLong,
-}
-
 impl SettingsItem {
     pub fn index(&self) -> u32 {
-        use SettingsItem::*;
-        match self {
-            TimerFocus => 0,
-            TimerShort => 1,
-            TimerLong => 2,
-            TimerLongInterval => 3,
-            AutoStartOnLaunch => 4,
-            TimerAutoFocus => 5,
-            TimerAutoShort => 6,
-            TimerAutoLong => 7,
-            HookFocus => 8,
-            HookShort => 9,
-            HookLong => 10,
-            AlarmPathFocus => 11,
-            AlarmPathShort => 12,
-            AlarmPathLong => 13,
-            AlarmVolumeFocus => 14,
-            AlarmVolumeShort => 15,
-            AlarmVolumeLong => 16,
-        }
+        *self as u32
     }
 
     pub fn from_index(idx: u32) -> Option<Self> {
-        use SettingsItem::*;
-        let ret = match idx {
-            0 => TimerFocus,
-            1 => TimerShort,
-            2 => TimerLong,
-            3 => TimerLongInterval,
-            4 => AutoStartOnLaunch,
-            5 => TimerAutoFocus,
-            6 => TimerAutoShort,
-            7 => TimerAutoLong,
-            8 => HookFocus,
-            9 => HookShort,
-            10 => HookLong,
-            11 => AlarmPathFocus,
-            12 => AlarmPathShort,
-            13 => AlarmPathLong,
-            14 => AlarmVolumeFocus,
-            15 => AlarmVolumeShort,
-            16 => AlarmVolumeLong,
-            _ => return None,
-        };
-        Some(ret)
+        Self::from_repr(idx as usize)
     }
 
     pub fn label_long(&self) -> &'static str {
-        match self.index() {
-            0 => "Focus Duration",
-            1 => "Short Break Duration",
-            2 => "Long Break Duration",
-            3 => "Long Break Interval",
-
-            8 => "Focus Hook Command",
-            9 => "Short Break Hook Command",
-            10 => "Long Break Hook Command",
-
-            11 => "Focus Alarm Sound File Path",
-            12 => "Short Break Alarm Sound File Path",
-            13 => "Long Break Alarm Sound File Path",
-
-            14 => "Focus Alarm Volume",
-            15 => "Short Break Alarm Volume",
-            16 => "Long Break Alarm Volume",
-            _ => panic!("label called on invalid item"),
-        }
+        self.get_detailed_message().unwrap()
     }
 
     pub fn label(&self) -> &'static str {
-        match self.index() {
-            0 => "Focus",
-            1 => "Short Break",
-            2 => "Long Break",
-            3 => "Long Break Interval",
-
-            4 => "Auto-start on Launch",
-            5 => "Focus",
-            6 => "Short Break",
-            7 => "Long Break",
-
-            8 => "Focus",
-            9 => "Short Break",
-            10 => "Long Break",
-
-            11 => "Focus",
-            12 => "Short Break",
-            13 => "Long Break",
-
-            14 => "Focus",
-            15 => "Short Break",
-            16 => "Long Break",
-            _ => panic!("label called on invalid item"),
-        }
+        self.get_message().unwrap()
     }
 
     pub fn section(&self) -> SettingsSection {
@@ -203,7 +95,7 @@ impl Display for SettingsItem {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, EnumCount, FromRepr, IntoStaticStr)]
 pub enum SettingsSection {
     Timer,
     Hook,
@@ -222,42 +114,25 @@ impl SettingsSection {
         Some(ret)
     }
 
-    pub fn from_index(idx: u32) -> Option<Self> {
-        use SettingsSection::*;
-        let ret = match idx {
-            0 => Timer,
-            1 => Hook,
-            2 => Alarm,
-            _ => return None,
-        };
-        Some(ret)
-    }
-
-    pub fn index(&self) -> u32 {
+    pub fn item_begin_idx(&self) -> u32 {
         use SettingsSection::*;
         match self {
             Timer => 0,
-            Hook => 1,
-            Alarm => 2,
+            Hook => 8,
+            Alarm => 11,
         }
     }
 
-    pub fn item_begin_idx(&self) -> u32 {
-        match self.index() {
-            0 => 0,
-            1 => 7,
-            2 => 10,
-            _ => panic!("label called on invalid section"),
-        }
+    pub fn from_index(idx: u32) -> Option<Self> {
+        Self::from_repr(idx as usize)
+    }
+
+    pub fn index(&self) -> u32 {
+        *self as u32
     }
 
     pub fn label(&self) -> &'static str {
-        match self.index() {
-            0 => "Timer",
-            1 => "Hook",
-            2 => "Alarm",
-            _ => panic!("label called on invalid section"),
-        }
+        self.into()
     }
 }
 
@@ -400,7 +275,7 @@ impl SettingsModel {
             .selected
             .index()
             .saturating_sub(1)
-            .clamp(0, SETTINGS_VIEW_ITEMS - 1); // 13 items total
+            .clamp(0, SettingsItem::COUNT as u32 - 1); // 13 items total
         self.selected = SettingsItem::from_index(idx).unwrap();
     }
 
@@ -410,19 +285,20 @@ impl SettingsModel {
             .selected
             .index()
             .saturating_add(1)
-            .clamp(0, SETTINGS_VIEW_ITEMS - 1); // 13 items total
+            .clamp(0, SettingsItem::COUNT as u32 - 1); // 13 items total
         self.selected = SettingsItem::from_index(idx).unwrap();
     }
 
     fn prev_section(&mut self) {
-        let idx = (self.selected.section().index() + SETTINGS_SECTIONS - 1) % SETTINGS_SECTIONS;
+        let idx = (self.selected.section().index() + SettingsItem::COUNT as u32 - 1)
+            % SettingsItem::COUNT as u32;
         self.selected =
             SettingsItem::from_index(SettingsSection::from_index(idx).unwrap().item_begin_idx())
                 .unwrap();
     }
 
     fn next_section(&mut self) {
-        let idx = (self.selected.section().index() + 1) % SETTINGS_SECTIONS;
+        let idx = (self.selected.section().index() + 1) % SettingsItem::COUNT as u32;
         self.selected =
             SettingsItem::from_index(SettingsSection::from_index(idx).unwrap().item_begin_idx())
                 .unwrap();
