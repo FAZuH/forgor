@@ -31,15 +31,33 @@ function stripMarkers(str) {
   return str.replace(markerRegex, "").replace(skipCiRegex, "").trim();
 }
 
-function extractScope(body) {
-  if (!body) return "General";
+const TYPE_LABELS = {
+  feat: "New Features",
+  fix: "Bug Fixes",
+  perf: "Performance Improvements",
+  docs: "Documentation",
+  revert: "Reverts",
+  style: "Styles",
+  chore: "Miscellaneous Chores",
+  refactor: "Code Refactoring",
+  test: "Tests",
+  build: "Build System",
+  ci: "Continuous Integration",
+};
+
+function typeLabel(type) {
+  return TYPE_LABELS[type] || type;
+}
+
+function extractScope(body, fallback) {
+  if (!body) return fallback;
 
   const cleaned = stripMarkers(body);
   const lines = cleaned
     .split("\n")
     .map((l) => l.trim())
     .filter((l) => l !== "");
-  if (lines.length === 0) return "General";
+  if (lines.length === 0) return fallback;
 
   const first = lines[0];
 
@@ -49,7 +67,7 @@ function extractScope(body) {
   const inlineMatch = first.match(/^\[([^\]]+)\]\s+(.*)$/);
   if (inlineMatch) return inlineMatch[1];
 
-  return "General";
+  return fallback;
 }
 
 function extractChangelogText(body) {
@@ -95,10 +113,11 @@ async function getOptions() {
         if (commit.body) commit.body = stripMarkers(commit.body);
         commit.scope = null;
 
-        const scope = extractScope(commit.body);
+        const originalType = commit.type;
+        const scope = extractScope(commit.body, originalType);
         const changelogText = extractChangelogText(commit.body);
 
-        commit.type = scope;
+        commit.type = scope === originalType ? typeLabel(scope) : scope;
 
         if (changelogText) {
           commit.subject = changelogText;
@@ -139,7 +158,9 @@ async function getOptions() {
 
       if (context.commitGroups) {
         for (const group of context.commitGroups) {
-          group.title = group.key;
+          if (group.commits && group.commits.length > 0) {
+            group.title = group.commits[0].type;
+          }
         }
       }
 
