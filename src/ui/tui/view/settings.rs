@@ -143,12 +143,7 @@ impl TuiSettingsView {
         sections
     }
 
-    fn timer_section(
-        &self,
-        model: &SettingsModel,
-        conf: &Timers,
-        sections: &mut Vec<Section>,
-    ) {
+    fn timer_section(&self, model: &SettingsModel, conf: &Timers, sections: &mut Vec<Section>) {
         use SettingsItem::*;
         // Build Pomodoro Timer section
         let mut r = Vec::new();
@@ -203,12 +198,7 @@ impl TuiSettingsView {
         });
     }
 
-    fn hook_section(
-        &self,
-        model: &SettingsModel,
-        conf: &Hooks,
-        sections: &mut Vec<Section>,
-    ) {
+    fn hook_section(&self, model: &SettingsModel, conf: &Hooks, sections: &mut Vec<Section>) {
         use SettingsItem::*;
         // Build Command Hooks section
         let mut r = Vec::new();
@@ -232,12 +222,7 @@ impl TuiSettingsView {
         });
     }
 
-    fn alarm_section(
-        &self,
-        model: &SettingsModel,
-        conf: &Alarms,
-        sections: &mut Vec<Section>,
-    ) {
+    fn alarm_section(&self, model: &SettingsModel, conf: &Alarms, sections: &mut Vec<Section>) {
         use SettingsItem::*;
         let mut r = Vec::new();
 

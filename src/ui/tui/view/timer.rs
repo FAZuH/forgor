@@ -83,13 +83,13 @@ impl TuiTimerView {
                 Line::from(vec![
                     Span::from("       "),
                     Span::styled(
-                        "  y/enter: Yes  ",
-                        Style::new().fg(Color::DarkGray).bg(Color::Green),
+                        "  y/Enter: Yes  ",
+                        Style::new().fg(Color::Green).bg(Color::DarkGray),
                     ),
                     Span::from("   "),
                     Span::styled(
-                        "  n/esc: No  ",
-                        Style::new().fg(Color::DarkGray).bg(Color::Red),
+                        "  n/Esc: No  ",
+                        Style::new().fg(Color::Red).bg(Color::DarkGray),
                     ),
                     Span::from("       "),
                 ])
