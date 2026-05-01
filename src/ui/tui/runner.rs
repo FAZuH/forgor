@@ -243,7 +243,12 @@ impl TuiRunner {
                     self.state
                         .update_timer(TimerMsg::SetPromptNextSession(false));
                 }
-                KeyCode::Esc | KeyCode::Char('n') => self.quit(),
+                KeyCode::Esc | KeyCode::Char('n') => {
+                    self.transition();
+                    self.state.update_pomo(PomodoroMsg::Pause);
+                    self.state
+                        .update_timer(TimerMsg::SetPromptNextSession(false));
+                }
                 _ => {}
             }
         }
