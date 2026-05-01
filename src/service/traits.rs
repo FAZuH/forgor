@@ -1,4 +1,4 @@
-use crate::services::SoundError;
+use crate::service::SoundError;
 
 pub trait SoundService {
     type SoundType;

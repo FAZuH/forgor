@@ -3,7 +3,7 @@ pub mod config;
 pub mod error;
 pub mod log;
 pub mod models;
-pub mod services;
+pub mod service;
 pub mod ui;
 pub mod utils;
 

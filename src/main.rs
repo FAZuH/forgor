@@ -4,7 +4,7 @@ use tomo::config::Config;
 use tomo::error::AppError;
 use tomo::log::setup_logging;
 use tomo::models::Pomodoro;
-use tomo::services::alarm::AlarmService;
+use tomo::service::alarm::AlarmService;
 use tomo::ui::Runner;
 
 fn main() -> Result<(), AppError> {

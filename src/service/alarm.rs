@@ -9,8 +9,8 @@ use rodio::Player;
 use crate::config::pomodoro::Alarm;
 use crate::config::pomodoro::Alarms;
 use crate::models::pomodoro::Mode;
-use crate::services::SoundError;
-use crate::services::SoundService;
+use crate::service::SoundError;
+use crate::service::SoundService;
 
 pub struct AlarmService {
     focus: Alarm,
