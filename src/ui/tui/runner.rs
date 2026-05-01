@@ -468,31 +468,28 @@ impl Deref for TuiRunner {
 }
 
 struct TickHandler {
-    last_tick: Option<Instant>,
+    last_tick: Instant,
     tick_rate: Duration,
 }
 
 impl TickHandler {
+    fn new(tick_rate: Duration) -> Self {
+        Self { last_tick: Instant::now(), tick_rate }
+    }
+
     fn new_tick(&mut self) -> bool {
-        match self.last_tick {
-            Some(last) => {
-                let now = Instant::now();
-                let new_tick = now.duration_since(last) >= self.tick_rate;
-                if new_tick {
-                    self.last_tick = Some(now);
-                }
-                new_tick
-            }
-            None => true,
+        let now = Instant::now();
+        if now.duration_since(self.last_tick) >= self.tick_rate {
+            self.last_tick = now;
+            true
+        } else {
+            false
         }
     }
 }
 
 impl Default for TickHandler {
     fn default() -> Self {
-        Self {
-            last_tick: None,
-            tick_rate: Duration::from_secs(1),
-        }
+        Self::new(Duration::from_secs(1))
     }
 }
