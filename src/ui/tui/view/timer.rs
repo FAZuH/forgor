@@ -9,8 +9,8 @@ use ratatui::widgets::Gauge;
 use ratatui::widgets::Paragraph;
 use tui_widgets::popup::Popup;
 
-use crate::models::Pomodoro;
-use crate::models::pomodoro::Mode;
+use crate::model::Pomodoro;
+use crate::model::pomodoro::Mode;
 use crate::ui::prelude::*;
 use crate::utils;
 

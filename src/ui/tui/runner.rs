@@ -17,8 +17,8 @@ use tui_widgets::prompts::Status;
 
 use crate::config::Config;
 use crate::config::Percentage;
-use crate::models::Pomodoro;
-use crate::models::pomodoro::Mode;
+use crate::model::Pomodoro;
+use crate::model::pomodoro::Mode;
 use crate::service::SoundService;
 use crate::service::cmd_runner::run_cmds;
 use crate::service::notify::notify;

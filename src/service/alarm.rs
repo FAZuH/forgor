@@ -8,7 +8,7 @@ use rodio::Player;
 
 use crate::config::pomodoro::Alarm;
 use crate::config::pomodoro::Alarms;
-use crate::models::pomodoro::Mode;
+use crate::model::pomodoro::Mode;
 use crate::service::SoundError;
 use crate::service::SoundService;
 

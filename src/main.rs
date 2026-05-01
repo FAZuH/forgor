@@ -3,7 +3,7 @@ use tomo::cli::Cli;
 use tomo::config::Config;
 use tomo::error::AppError;
 use tomo::log::setup_logging;
-use tomo::models::Pomodoro;
+use tomo::model::Pomodoro;
 use tomo::service::alarm::AlarmService;
 use tomo::ui::Runner;
 

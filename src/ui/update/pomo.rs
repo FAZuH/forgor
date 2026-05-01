@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::models::Pomodoro;
+use crate::model::Pomodoro;
 use crate::ui::prelude::*;
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
