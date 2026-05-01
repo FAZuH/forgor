@@ -83,8 +83,12 @@ impl TuiRunner {
     fn run_loop(&mut self) -> Result<(), TuiError> {
         self.snapshot_settings();
 
+        let mut redraw = true;
         while !self.router().is_quit() {
-            let mut redraw = false;
+            if redraw {
+                self.render_terminal()?;
+                redraw = false
+            }
 
             if self.tick.new_tick() {
                 self.tick();
@@ -96,10 +100,6 @@ impl TuiRunner {
                     let event = event::read()?;
                     redraw |= self.handle_key_event(event)?;
                 }
-            }
-
-            if redraw {
-                self.render_terminal()?;
             }
         }
         Ok(())
