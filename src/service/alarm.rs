@@ -1,9 +1,9 @@
 use std::fs::File;
-use std::thread::JoinHandle;
 
 use log::info;
 use rodio::Decoder;
 use rodio::DeviceSinkBuilder;
+use rodio::MixerDeviceSink;
 use rodio::Player;
 
 use crate::config::pomodoro::Alarm;
@@ -12,14 +12,18 @@ use crate::service::SoundService;
 
 pub struct AlarmService {
     conf: Option<Alarm>,
-    sound_thread: Option<JoinHandle<()>>,
+
+    player: Option<Player>,
+    // Player does not work if mixer is dropped.
+    mixer: Option<MixerDeviceSink>,
 }
 
 impl AlarmService {
     pub fn new() -> Self {
         Self {
             conf: None,
-            sound_thread: None,
+            player: None,
+            mixer: None,
         }
     }
 }
@@ -36,19 +40,27 @@ impl SoundService for AlarmService {
         if let Some(path) = &state.path
             && let Ok(file) = File::open(path)
         {
+            let decoder = Decoder::try_from(file)?;
+
             info!("Playing sound file {}", path.display());
-            let decoder = Decoder::try_from(file).unwrap();
-            let handle = DeviceSinkBuilder::open_default_sink()?;
-            let player = Player::connect_new(handle.mixer());
+
+            let mixer = DeviceSinkBuilder::open_default_sink()?;
+            let player = Player::connect_new(mixer.mixer());
             player.set_volume(state.volume.volume());
             player.append(decoder);
+            player.play();
 
-            self.sound_thread = Some(std::thread::spawn(move || {
-                player.sleep_until_end();
-                drop(handle);
-            }));
+            self.player = Some(player);
+            self.mixer = Some(mixer);
         }
 
+        Ok(())
+    }
+
+    fn stop(&mut self) -> Result<(), SoundError> {
+        if let Some(player) = &self.player {
+            player.stop()
+        }
         Ok(())
     }
 
@@ -57,12 +69,16 @@ impl SoundService for AlarmService {
     }
 
     fn is_playing(&self) -> bool {
-        self.sound_thread.is_some()
+        if let Some(player) = &self.player {
+            player.is_paused()
+        } else {
+            false
+        }
     }
 
     fn sleep_until_end(&mut self) {
-        if let Some(thread) = self.sound_thread.take() {
-            thread.join().ok();
+        if let Some(player) = &self.player {
+            player.sleep_until_end()
         }
     }
 }

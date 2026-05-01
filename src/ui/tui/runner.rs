@@ -350,6 +350,7 @@ impl TuiRunner {
 impl TuiRunner {
     fn transition(&mut self) {
         self.state.update_pomo(PomodoroMsg::NextState);
+        let _ = self.sound.stop();
     }
 
     fn should_auto_next(&self) -> bool {
