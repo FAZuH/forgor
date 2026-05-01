@@ -1,3 +1,27 @@
+## [0.2.0](https://github.com/FAZuH/tomo/compare/v0.1.7...v0.2.0) (2026-05-01)
+
+
+### fix
+
+* **tui:** Alarm volume settings showing alarm path when editing ([1a389a9](https://github.com/FAZuH/tomo/commit/1a389a914127bc3cb32a387ae67c4148428d1363))
+* **tui:** Crash when toast exceeds frame height ([1de1a29](https://github.com/FAZuH/tomo/commit/1de1a2942819df43eb8e4cbc9d753786a333dc40))
+* **tui:** Fix toast deduplication issues ([8c098d2](https://github.com/FAZuH/tomo/commit/8c098d2e53ca6ded0257bb8f42301e7f445da3df))
+
+
+### feat
+
+* **tui:** Add settings page keybind help ([8db8c50](https://github.com/FAZuH/tomo/commit/8db8c501ad92318257e2465e151a70a6902b585b))
+* **tui:** Add settings section navigation and improve UI ([f628c27](https://github.com/FAZuH/tomo/commit/f628c271fd20d0cbd0adb65dc27fcfb280499a6a))
+* **tui:** Add settings section select buttons ([3124353](https://github.com/FAZuH/tomo/commit/312435375e4b7db62bbef1c89a294c874f6005c2))
+* **tui:** Add toast deduplication ([eaab8f0](https://github.com/FAZuH/tomo/commit/eaab8f0da4fe7371675d8b71d847a1bc594b823d))
+* **tui:** Adjust padding of settings ([33fd694](https://github.com/FAZuH/tomo/commit/33fd69471d68587fd100028cd9c83cbbbac384e8))
+* **tui:** Improve settings layout ([4024c54](https://github.com/FAZuH/tomo/commit/4024c544edb3b11bc822eb90e2fd42ff9ddf8ae4))
+* **tui:** Improve timer page keybind hint ([8ffca11](https://github.com/FAZuH/tomo/commit/8ffca117a355b311921ca9aa06a856b12eb7b34c))
+* **tui:** Invert timer 30sec offset keybinds ([d586abd](https://github.com/FAZuH/tomo/commit/d586abd445ebd8d8dbc318bee4872760e7da8750))
+* **tui:** Make settings checkbox label dim ([08f8dcd](https://github.com/FAZuH/tomo/commit/08f8dcdf3b65a07c54b889f2e6bee24b33b1aa92))
+* **tui:** Make timer shortcut toggleable ([8900478](https://github.com/FAZuH/tomo/commit/8900478530b941b3d986099d914814c3bd5784b4))
+* **tui:** Trim percent when editing alarm volume ([83a47ec](https://github.com/FAZuH/tomo/commit/83a47ecee1437bec36c7bad6229306bd8a636bb0))
+
 ## [0.1.7](https://github.com/FAZuH/tomo/compare/v0.1.6...v0.1.7) (2026-04-28)
 
 
@@ -75,22 +99,4 @@
 ### refactor
 
 * Rename logging var to TOMO_LOG ([d825181](https://github.com/FAZuH/tomo/commit/d825181c519b8b29b5834863f90ae1e689fde568))
-
-## [0.1.3](https://github.com/FAZuH/tomo/compare/v0.1.2...v0.1.3) (2026-04-25)
-
-
-### feat
-
-* **db:** Add database ([5aab18d](https://github.com/FAZuH/tomo/commit/5aab18dbe807bd615d3f0962fd97c9f7d53d38ca))
-* **tui:** Improve settings UI ([86c0bf8](https://github.com/FAZuH/tomo/commit/86c0bf8223fc15d1a9f4139041090fa28638ca8c))
-
-
-### docs
-
-* Add screenshot to README ([8d8c699](https://github.com/FAZuH/tomo/commit/8d8c69945471185d75985eaaf80c6b46e449dc8a))
-
-
-### fix
-
-* Duration configs not saved as simple seconds ([796835f](https://github.com/FAZuH/tomo/commit/796835ff3cb929a9c520424525915688292f1d0f))
 
