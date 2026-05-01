@@ -58,7 +58,7 @@ impl<'a> StatefulViewRef<Canvas<'a, '_>> for TuiSettingsView {
         let content_width = content_area.width.saturating_sub(2).max(46);
 
         // Build sections with proper layout
-        let sections = self.build_sections(model, &conf.pomodoro);
+        let sections = self.sections(model, &conf.pomodoro);
 
         // Create scroll view with full content size
         let mut scroll_view = ScrollView::new(Size::new(content_width, content_area.height))
@@ -133,17 +133,17 @@ impl TuiSettingsView {
     }
 
     /// Build sections from config, calculating layout and identifying editable items
-    fn build_sections(&self, model: &SettingsModel, config: &PomodoroConfig) -> Vec<Section> {
+    fn sections(&self, model: &SettingsModel, config: &PomodoroConfig) -> Vec<Section> {
         let mut sections = Vec::new();
 
-        self.build_timer_section(model, &config.timer, &mut sections);
-        self.build_hooks_section(model, &config.hook, &mut sections);
-        self.build_alarm_section(model, &config.alarm, &mut sections);
+        self.timer_section(model, &config.timer, &mut sections);
+        self.hook_section(model, &config.hook, &mut sections);
+        self.alarm_section(model, &config.alarm, &mut sections);
 
         sections
     }
 
-    fn build_timer_section(
+    fn timer_section(
         &self,
         model: &SettingsModel,
         conf: &Timers,
@@ -203,7 +203,7 @@ impl TuiSettingsView {
         });
     }
 
-    fn build_hooks_section(
+    fn hook_section(
         &self,
         model: &SettingsModel,
         conf: &Hooks,
@@ -232,7 +232,7 @@ impl TuiSettingsView {
         });
     }
 
-    fn build_alarm_section(
+    fn alarm_section(
         &self,
         model: &SettingsModel,
         conf: &Alarms,
