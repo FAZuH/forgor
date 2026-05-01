@@ -1,7 +1,7 @@
 use notify_rust::Notification;
 use notify_rust::{self};
 
-use crate::models::pomodoro::Mode;
+use crate::model::pomodoro::Mode;
 
 impl From<Mode> for Notification {
     fn from(value: Mode) -> Self {

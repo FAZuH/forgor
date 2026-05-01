@@ -3,11 +3,9 @@ use tomo::cli::Cli;
 use tomo::config::Config;
 use tomo::error::AppError;
 use tomo::log::setup_logging;
-use tomo::models::Pomodoro;
-use tomo::services::alarm::AlarmService;
+use tomo::model::Pomodoro;
+use tomo::service::alarm::AlarmService;
 use tomo::ui::Runner;
-use tomo::ui::tui::TuiRunner;
-use tomo::ui::tui::view::TuiView;
 
 fn main() -> Result<(), AppError> {
     let cli = Cli::parse();
@@ -24,6 +22,9 @@ fn main() -> Result<(), AppError> {
 }
 
 fn runner<'b>(conf: Config, pomo: Pomodoro) -> impl Runner + 'b {
+    use tomo::ui::tui::TuiRunner;
+    use tomo::ui::tui::view::TuiView;
+
     let sound = Box::new(AlarmService::new(conf.pomodoro.alarm.clone()));
     let view = Box::new(TuiView::new());
     TuiRunner::new(pomo, conf, view, sound).unwrap()
