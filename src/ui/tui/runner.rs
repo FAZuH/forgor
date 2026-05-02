@@ -196,34 +196,60 @@ impl TuiRunner {
 
         if let Event::Key(key) = event {
             match key.code {
-                Right | Char('l') => {
-                    self.update_pomo(Subtract(Duration::from_secs(30)));
-                }
-                Down | Char('j') => {
-                    self.update_pomo(Subtract(Duration::from_secs(60)));
-                }
-                Left | Char('h') => {
-                    self.update_pomo(Add(Duration::from_secs(30)));
-                }
-                Up | Char('k') => {
-                    self.update_pomo(Add(Duration::from_secs(60)));
-                }
-                Char(' ') => {
-                    self.update_pomo(TogglePause);
-                }
-                Enter => {
-                    self.update_pomo(SkipSession);
-                }
-                Backspace => {
-                    self.update_pomo(ResetSession);
-                }
+                Right | Char('l') => self.update_pomo(Subtract(Duration::from_secs(30))),
+                Down | Char('j') => self.update_pomo(Subtract(Duration::from_secs(60))),
+                Left | Char('h') => self.update_pomo(Add(Duration::from_secs(30))),
+                Up | Char('k') => self.update_pomo(Add(Duration::from_secs(60))),
+                Char(' ') => self.update_pomo(TogglePause),
+                Enter => self.update_pomo(SkipSession),
+                Backspace => self.update_pomo(ResetSession),
                 Char('q') => self.quit(),
                 Char('s') => self.router_mut().navigate(Page::Settings),
-                Char('/') | Char('?') => {
-                    self.update_timer(TimerMsg::ToggleShowKeybinds);
-                }
+                Char('/') | Char('?') => self.update_timer(TimerMsg::ToggleShowKeybinds),
                 _ => {}
             }
+        }
+    }
+
+    /// Handle settings page input directly, mutating renderer state
+    fn handle_settings(&mut self, event: Event) {
+        // When editing, handle text input
+        if self.settings().is_editing() {
+            return self.handle_settings_edit(event);
+        }
+
+        // When navigating, handle navigation input
+        use KeyCode::*;
+        use SettingsMsg::*;
+        match event {
+            Event::Key(key) => match key.code {
+                Up | Char('k') => self.update_settings(SelectUp),
+                BackTab => self.update_settings(SectionPrev),
+                Tab => self.update_settings(SectionNext),
+                Down | Char('j') => self.update_settings(SelectDown),
+                Enter | Char(' ') => {
+                    if self.settings().selected().is_toggle() {
+                        self.update_settings(SaveEdit);
+                    } else {
+                        let pomo = &self.conf().pomodoro.clone();
+                        self.settings_mut().start_editing_for_field(pomo)
+                    }
+                }
+                Char('1') => self.update_settings(SectionSelect(0)),
+                Char('2') => self.update_settings(SectionSelect(1)),
+                Char('3') => self.update_settings(SectionSelect(2)),
+                Char('s') => self.save_settings(),
+                Esc => self.router_mut().navigate(Page::Timer),
+                Char('q') => self.quit(),
+                Char('/') | Char('?') => self.update_settings(ToggleShowKeybinds),
+                _ => {}
+            },
+            Event::Mouse(mouse) => match mouse.kind {
+                MouseEventKind::ScrollDown => self.update_settings(ScrollUp),
+                MouseEventKind::ScrollUp => self.update_settings(ScrollDown),
+                _ => {}
+            },
+            _ => {}
         }
     }
 
@@ -244,66 +270,6 @@ impl TuiRunner {
         }
     }
 
-    /// Handle settings page input directly, mutating renderer state
-    fn handle_settings(&mut self, event: Event) {
-        // When editing, handle text input
-        if self.settings().is_editing() {
-            return self.handle_settings_edit(event);
-        }
-
-        // When navigating, handle navigation input
-        use KeyCode::*;
-        use SettingsMsg::*;
-        match event {
-            Event::Key(key) => match key.code {
-                Up | Char('k') => {
-                    self.update_settings(SelectUp);
-                }
-                BackTab => {
-                    self.update_settings(SectionPrev);
-                }
-                Tab => {
-                    self.update_settings(SectionNext);
-                }
-                Down | Char('j') => {
-                    self.update_settings(SelectDown);
-                }
-                Enter | Char(' ') => {
-                    if self.settings().selected().is_toggle() {
-                        self.update_settings(SaveEdit);
-                    } else {
-                        let pomo = &self.conf().pomodoro.clone();
-                        self.settings_mut().start_editing_for_field(pomo)
-                    }
-                }
-                Char('1') => {
-                    self.update_settings(SectionSelect(0));
-                }
-                Char('2') => {
-                    self.update_settings(SectionSelect(1));
-                }
-                Char('3') => {
-                    self.update_settings(SectionSelect(2));
-                }
-                Char('s') => self.save_settings(),
-                Esc => self.router_mut().navigate(Page::Timer),
-                Char('q') => self.quit(),
-                Char('/') | Char('?') => self.update_settings(ToggleShowKeybinds),
-                _ => {}
-            },
-            Event::Mouse(mouse) => match mouse.kind {
-                MouseEventKind::ScrollDown => {
-                    self.update_settings(ScrollUp);
-                }
-                MouseEventKind::ScrollUp => {
-                    self.update_settings(ScrollDown);
-                }
-                _ => {}
-            },
-            _ => {}
-        }
-    }
-
     fn handle_settings_edit(&mut self, event: Event) {
         if let Event::Key(key) = event
             && let Some(prompt) = self.settings_mut().prompt_state_mut()
@@ -311,17 +277,22 @@ impl TuiRunner {
             prompt.text_state.handle_key_event(key);
 
             match prompt.text_state.status() {
-                Status::Done => {
-                    self.update_settings(SettingsMsg::SaveEdit);
-                }
-                Status::Aborted => {
-                    self.update_settings(SettingsMsg::CancelEditing);
-                }
+                Status::Done => self.update_settings(SettingsMsg::SaveEdit),
+                Status::Aborted => self.update_settings(SettingsMsg::CancelEditing),
                 _ => {}
             }
         }
     }
+}
 
+// ---------------------------------------------------------
+//  ___ _____ _ _____ ___    ___  ___ ___ ___    _ _____ ___ ___  _  _ ___
+// / __|_   _/_\_   _| __|  / _ \| _ \ __| _ \  /_\_   _|_ _/ _ \| \| / __|
+// \__ \ | |/ _ \| | | _|  | (_) |  _/ _||   / / _ \| |  | | (_) | .` \__ \
+// |___/ |_/_/ \_\_| |___|  \___/|_| |___|_|_\/_/ \_\_| |___\___/|_|\_|___/
+// ---------------------------------------------------------
+
+impl TuiRunner {
     fn handle_pomodoro_cmd(&mut self, cmd: PomodoroCmd) {
         use PomodoroCmd::*;
         match cmd {
@@ -367,16 +338,7 @@ impl TuiRunner {
             ConfigCmd::None => {}
         }
     }
-}
 
-// ---------------------------------------------------------
-//  ___ _____ _ _____ ___    ___  ___ ___ ___    _ _____ ___ ___  _  _ ___
-// / __|_   _/_\_   _| __|  / _ \| _ \ __| _ \  /_\_   _|_ _/ _ \| \| / __|
-// \__ \ | |/ _ \| | | _|  | (_) |  _/ _||   / / _ \| |  | | (_) | .` \__ \
-// |___/ |_/_/ \_\_| |___|  \___/|_| |___|_|_\/_/ \_\_| |___\___/|_|\_|___/
-// ---------------------------------------------------------
-
-impl TuiRunner {
     fn transition(&mut self) {
         self.update_pomo(PomodoroMsg::NextState);
         let _ = self.sound.stop();
