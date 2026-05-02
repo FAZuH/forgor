@@ -76,13 +76,13 @@ impl TuiState {
     ///
     /// Use with [`Self::check_settings_updated`]
     pub fn snapshot_settings(&mut self) {
-        self.latest_config_save = Some(self.conf().clone())
+        self.latest_config_save = Some(self.settings.conf.clone())
     }
 
     /// Compare current config with when it was latest saved.
     pub fn check_settings_unsaved(&self) -> bool {
         if let Some(last) = &self.latest_config_save {
-            return *self.conf() != *last;
+            return self.settings.conf != *last;
         }
         true
     }

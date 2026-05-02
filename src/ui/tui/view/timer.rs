@@ -306,13 +306,17 @@ impl Updateable for TimerModel {
     type Msg = TimerMsg;
     type Cmd = TimerCmd;
 
-    fn update(&mut self, msg: Self::Msg) -> Self::Cmd {
+    fn update(&mut self, msg: Self::Msg) -> Vec<Self::Cmd> {
         use TimerMsg::*;
         match msg {
             SetPromptNextSession(v) => self.prompt_transition = v,
             SetShowKeybinds(v) => self.show_keybinds = v,
+            ToggleShowKeybinds => {
+                let new = !self.show_keybinds;
+                self.update(TimerMsg::SetShowKeybinds(new));
+            }
         }
-        TimerCmd::None
+        vec![]
     }
 }
 
@@ -327,10 +331,5 @@ impl TimerModel {
 
     pub fn show_keybinds(&self) -> bool {
         self.show_keybinds
-    }
-
-    pub fn toggle_keybinds(&mut self) {
-        let new = !self.show_keybinds;
-        self.update(TimerMsg::SetShowKeybinds(new));
     }
 }

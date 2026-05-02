@@ -7,7 +7,7 @@ pub trait Runner {
 pub trait Updateable {
     type Msg;
     type Cmd;
-    fn update(&mut self, msg: Self::Msg) -> Self::Cmd;
+    fn update(&mut self, msg: Self::Msg) -> Vec<Self::Cmd>;
 }
 
 pub trait View<C> {

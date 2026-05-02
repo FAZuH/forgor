@@ -28,9 +28,9 @@ impl Updateable for Pomodoro {
     type Msg = PomodoroMsg;
     type Cmd = PomodoroCmd;
 
-    fn update(&mut self, msg: Self::Msg) -> Self::Cmd {
+    fn update(&mut self, msg: Self::Msg) -> Vec<Self::Cmd> {
         use PomodoroMsg::*;
-        let mut cmd = PomodoroCmd::None;
+        let mut cmd = vec![];
         match msg {
             Add(dur) => self.add(dur),
             Subtract(dur) => self.subtract(dur),
@@ -45,9 +45,9 @@ impl Updateable for Pomodoro {
             ResetSession => self.reset(),
             NextState => {
                 self.skip();
-                cmd = PomodoroCmd::SessionContinued;
+                cmd.push(PomodoroCmd::SessionContinued)
             }
-            Tick { auto_next } => cmd = self.tick(auto_next),
+            Tick { auto_next } => cmd.push(self.tick(auto_next)),
         }
         cmd
     }
@@ -71,6 +71,7 @@ impl Pomodoro {
 pub enum TimerMsg {
     SetPromptNextSession(bool),
     SetShowKeybinds(bool),
+    ToggleShowKeybinds,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
