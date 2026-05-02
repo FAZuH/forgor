@@ -2,14 +2,16 @@ pub mod settings;
 pub mod timer;
 
 use ratatui::prelude::*;
+pub use settings::SettingsModel;
 pub use settings::SettingsState;
 pub use settings::TuiSettingsView;
+pub use timer::TimerModel;
 pub use timer::TimerState;
 pub use timer::TuiTimerView;
 
 use crate::config::Config;
 use crate::ui::prelude::*;
-use crate::ui::tui::toasts::ToastHandler;
+use crate::ui::tui::toast::ToastHandler;
 
 pub type Canvas<'a, 'b> = &'a mut Frame<'b>;
 type State = TuiState;

@@ -66,3 +66,14 @@ impl Pomodoro {
         }
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimerMsg {
+    SetPromptNextSession(bool),
+    SetShowKeybinds(bool),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimerCmd {
+    None,
+}

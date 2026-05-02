@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -6,13 +7,14 @@ use strum::EnumDiscriminants;
 use strum::EnumIter;
 use strum::EnumMessage;
 use strum::FromRepr;
+use strum::IntoStaticStr;
 use strum::VariantArray;
 
 use crate::config::Config;
 use crate::config::Percentage;
 use crate::ui::prelude::*;
 
-#[derive(Clone, Debug, PartialEq, EnumDiscriminants, EnumCount)]
+#[derive(Clone, Debug, PartialEq, EnumDiscriminants, EnumCount, EnumMessage, FromRepr)]
 #[strum_discriminants(derive(
     PartialOrd,
     Ord,

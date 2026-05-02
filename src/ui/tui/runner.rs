@@ -15,23 +15,20 @@ use ratatui_toaster::ToastType;
 use tui_widgets::prompts::State as PromptState;
 use tui_widgets::prompts::Status;
 
+use crate::config::Alarm;
 use crate::config::Config;
 use crate::config::Percentage;
-use crate::config::pomodoro::Alarm;
+use crate::model::Mode;
 use crate::model::Pomodoro;
-use crate::model::pomodoro::Mode;
 use crate::service::SoundService;
 use crate::service::cmd_runner::run_cmds;
 use crate::service::notify::notify;
+use crate::ui::UiError;
 use crate::ui::prelude::*;
 use crate::ui::tui::TuiError;
 use crate::ui::tui::backend::Tui;
-use crate::ui::tui::toasts::ToastHandler;
-use crate::ui::tui::view::Canvas;
-use crate::ui::tui::view::TuiState;
-use crate::ui::tui::view::settings::SettingsState;
-use crate::ui::tui::view::timer::TimerState;
-use crate::ui::*;
+use crate::ui::tui::toast::ToastHandler;
+use crate::ui::tui::view::*;
 
 type Sound = Box<dyn SoundService<SoundType = Alarm> + Send + Sync>;
 type View = Box<

@@ -1,5 +1,5 @@
-use crate::config::pomodoro::Hooks;
-use crate::model::pomodoro::Mode;
+use crate::config::Hooks;
+use crate::model::Mode;
 
 pub fn run_cmds(conf: &Hooks, state: Mode) {
     let cmd = match state {

@@ -6,7 +6,7 @@ use rodio::DeviceSinkBuilder;
 use rodio::MixerDeviceSink;
 use rodio::Player;
 
-use crate::config::pomodoro::Alarm;
+use crate::config::Alarm;
 use crate::service::SoundError;
 use crate::service::SoundService;
 
