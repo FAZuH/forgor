@@ -71,6 +71,7 @@ impl TuiRunner {
 
     fn run_loop(&mut self) -> Result<(), TuiError> {
         self.state.snapshot_settings();
+        self.initial_run();
 
         while !self.router().is_quit() {
             self.render_terminal()?;
@@ -96,9 +97,16 @@ impl TuiRunner {
     fn tick(&mut self) {
         if self.tick.new_tick() {
             self.state.toast.tick();
-            let auto_next = self.should_auto_next();
-            self.update_pomo(PomodoroMsg::Tick { auto_next });
+            self.update_pomo(PomodoroMsg::Tick);
             self.redraw();
+        }
+    }
+
+    fn initial_run(&mut self) {
+        if self.conf().pomodoro.timer.auto_start_on_launch {
+            self.update_pomo(PomodoroMsg::Start);
+        } else {
+            self.update_pomo(PomodoroMsg::StartPaused);
         }
     }
 }
@@ -257,13 +265,10 @@ impl TuiRunner {
         if let Event::Key(key) = event {
             match key.code {
                 KeyCode::Enter | KeyCode::Char('y') => {
-                    self.transition();
-                    self.update_timer(TimerMsg::SetPromptNextSession(false));
+                    self.update_timer(TimerMsg::PromptNextSessionAnswerYes(true));
                 }
                 KeyCode::Esc | KeyCode::Char('n') => {
-                    self.transition();
-                    self.update_pomo(PomodoroMsg::Pause);
-                    self.update_timer(TimerMsg::SetPromptNextSession(false));
+                    self.update_timer(TimerMsg::PromptNextSessionAnswerYes(false));
                 }
                 _ => {}
             }
@@ -296,26 +301,30 @@ impl TuiRunner {
     fn handle_pomodoro_cmd(&mut self, cmd: PomodoroCmd) {
         use PomodoroCmd::*;
         match cmd {
-            None => {}
-            PromptNextSession => {
-                if !self.timer().prompt_transition() {
-                    // only runs on once per session
+            Started => {},
+            StartedPaused => {},
+            SessionEnd => {
+                if self.should_auto_next() {
                     self.on_session_end();
+                    self.update_pomo(PomodoroMsg::NextSession);
+                } else {
+                    // Will repeatedly run on session end
+                    if !self.timer().prompt_transition() {
+                        self.on_session_end();
+                    }
+                    self.update_timer(TimerMsg::SetPromptNextSession(true));
                 }
-                self.update_timer(TimerMsg::SetPromptNextSession(true));
             }
-            NextSession => {
-                self.on_session_end();
-                self.transition();
-            }
-            SessionContinued => {}
+            NextSession => {}
+            SessionPaused => {}
+            SessionResumed => {}
+            SessionSkipped => {}
         }
     }
 
     fn handle_settings_cmd(&mut self, cmd: SettingsCmd) {
         use SettingsCmd::*;
         match cmd {
-            None => {}
             SaveEdit(msg) => {
                 self.update_conf(msg);
                 let is_unsaved = self.state.check_settings_unsaved();
@@ -328,8 +337,17 @@ impl TuiRunner {
     }
 
     fn handle_timer_cmd(&mut self, cmd: TimerCmd) {
+        use TimerCmd::*;
         match cmd {
-            TimerCmd::None => {}
+            PromptTransitionAnsweredYes => {
+                self.update_pomo(PomodoroMsg::NextSession);
+                self.update_timer(TimerMsg::SetPromptNextSession(false));
+                let _ = self.sound.stop();
+            }
+            PromptTransitionAnsweredNo => {
+                self.update_pomo(PomodoroMsg::Pause);
+                self.handle_timer_cmd(PromptTransitionAnsweredNo);
+            }
         }
     }
 
@@ -337,11 +355,6 @@ impl TuiRunner {
         match cmd {
             ConfigCmd::None => {}
         }
-    }
-
-    fn transition(&mut self) {
-        self.update_pomo(PomodoroMsg::NextState);
-        let _ = self.sound.stop();
     }
 
     fn should_auto_next(&self) -> bool {

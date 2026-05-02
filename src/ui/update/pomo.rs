@@ -12,16 +12,23 @@ pub enum PomodoroMsg {
     Resume,
     SkipSession,
     ResetSession,
-    Tick { auto_next: bool },
-    NextState,
+    Tick,
+    NextSession,
+    Start,
+    StartPaused,
 }
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
 pub enum PomodoroCmd {
-    None,
-    PromptNextSession,
+    Started,
+    StartedPaused,
+
+    SessionEnd,
     NextSession,
-    SessionContinued,
+
+    SessionPaused,
+    SessionResumed,
+    SessionSkipped,
 }
 
 impl Updateable for Pomodoro {
@@ -30,51 +37,63 @@ impl Updateable for Pomodoro {
 
     fn update(&mut self, msg: Self::Msg) -> Vec<Self::Cmd> {
         use PomodoroMsg::*;
-        let mut cmd = vec![];
+        let mut cmds = vec![];
         match msg {
+            Start => {
+                let _ = self.start();
+                cmds.push(PomodoroCmd::Started)
+            }
+            StartPaused => {
+                let _ = self.start();
+                let _ = self.pause();
+                cmds.push(PomodoroCmd::StartedPaused)
+            }
             Add(dur) => self.add(dur),
             Subtract(dur) => self.subtract(dur),
-            TogglePause => self.toggle_pause(),
             Pause => {
                 let _ = self.pause();
+                cmds.push(PomodoroCmd::SessionPaused)
             }
             Resume => {
                 let _ = self.resume();
+                cmds.push(PomodoroCmd::SessionResumed)
             }
-            SkipSession => self.skip(),
-            ResetSession => self.reset(),
-            NextState => {
+            TogglePause => {
+                if self.is_running() {
+                    cmds.extend(self.update(Pause));
+                } else {
+                    cmds.extend(self.update(Resume));
+                }
+            }
+            NextSession => {
                 self.skip();
-                cmd.push(PomodoroCmd::SessionContinued)
+                cmds.push(PomodoroCmd::NextSession)
             }
-            Tick { auto_next } => cmd.push(self.tick(auto_next)),
-        }
-        cmd
-    }
-}
-
-impl Pomodoro {
-    pub fn tick(&mut self, auto_next: bool) -> PomodoroCmd {
-        if self.remaining_time().is_zero() {
-            if auto_next {
-                PomodoroCmd::NextSession
-            } else {
-                PomodoroCmd::PromptNextSession
+            SkipSession => {
+                self.skip();
+                cmds.push(PomodoroCmd::SessionSkipped)
             }
-        } else {
-            PomodoroCmd::None
+            ResetSession => self.reset(),
+            Tick => {
+                if self.remaining_time().is_zero() {
+                    cmds.push(PomodoroCmd::SessionEnd)
+                }
+            }
         }
+        cmds
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimerMsg {
     SetPromptNextSession(bool),
+    PromptNextSessionAnswerYes(bool),
     SetShowKeybinds(bool),
     ToggleShowKeybinds,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimerCmd {
-    None,
+    PromptTransitionAnsweredYes,
+    PromptTransitionAnsweredNo,
 }

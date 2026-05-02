@@ -136,7 +136,6 @@ pub enum SettingsMsg {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SettingsCmd {
-    None,
     SaveEdit(ConfigMsg),
     ShowToast { message: String, r#type: ToastType },
 }
