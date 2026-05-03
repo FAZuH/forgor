@@ -42,12 +42,12 @@ impl Config {
         if !conf_path.exists() {
             let config = Config::default();
             let file = fs::File::create(&conf_path)?;
-            serde_yml::to_writer(&file, &config)?;
+            serde_norway::to_writer(&file, &config)?;
             info!("Default config written to {:?}", conf_path);
             Ok(config)
         } else {
             let file = fs::File::open(&conf_path)?;
-            let config: Config = serde_yml::from_reader(&file)?;
+            let config: Config = serde_norway::from_reader(&file)?;
             info!("Configuration loaded successfully");
             Ok(config)
         }
@@ -57,7 +57,7 @@ impl Config {
         let conf_dir = utils::conf_dir();
         let conf_path = conf_dir.join("config.yaml");
         let file = fs::File::create(&conf_path)?;
-        serde_yml::to_writer(&file, self)?;
+        serde_norway::to_writer(&file, self)?;
         info!("Configuration saved successfully");
         Ok(())
     }
@@ -124,7 +124,7 @@ pub enum ConfigError {
     Io(#[from] std::io::Error),
 
     #[error("Serialization error: {0}")]
-    Serialization(#[from] serde_yml::Error),
+    Serialization(#[from] serde_norway::Error),
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]

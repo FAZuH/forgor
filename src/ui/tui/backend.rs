@@ -25,6 +25,7 @@ impl Tui {
     }
 
     fn init() -> Result<Terminal<CrosstermBackend<Stderr>>, TuiError> {
+        color_eyre::install().map_err(|e| TuiError::InitializeError(e.to_string()))?;
         let buffer = std::io::stderr();
         let mut backend = CrosstermBackend::new(buffer);
 
