@@ -11,4 +11,5 @@ pub use super::update::SettingsMsg;
 pub use super::update::SettingsSection;
 pub use super::update::TimerCmd;
 pub use super::update::TimerMsg;
+pub use super::update::ToastType;
 pub use super::update::config::SettingsItem;

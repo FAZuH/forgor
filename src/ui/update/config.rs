@@ -85,12 +85,12 @@ impl Updateable for Config {
     type Msg = ConfigMsg;
     type Cmd = ConfigCmd;
 
-    fn update(&mut self, msg: Self::Msg) -> Self::Cmd {
+    fn update(&mut self, msg: Self::Msg) -> Vec<Self::Cmd> {
         use ConfigMsg::*;
         let timer = &mut self.pomodoro.timer;
         let hook = &mut self.pomodoro.hook;
         let alarm = &mut self.pomodoro.alarm;
-        let cmd = ConfigCmd::None;
+        let cmd = vec![ConfigCmd::None];
         match msg {
             // Timer
             AutoStartOnLaunch => timer.auto_start_on_launch = !timer.auto_start_on_launch,
@@ -128,15 +128,16 @@ pub enum SettingsMsg {
     ScrollDown,
     // StartEditing(PomodoroConfig),
     CancelEditing,
-    TakeEditValue,
     SetUnsavedChanges(bool),
     SetShowKeybinds(bool),
+    ToggleShowKeybinds,
+    SaveEdit,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SettingsCmd {
-    None,
-    EditValue(Option<String>),
+    SaveEdit(ConfigMsg),
+    ShowToast { message: String, r#type: ToastType },
 }
 
 impl SettingsItem {
@@ -272,4 +273,11 @@ impl From<SettingsItem> for SettingsSection {
     fn from(value: SettingsItem) -> Self {
         value.section()
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToastType {
+    Error,
+    Warning,
+    Success,
 }

@@ -1,6 +1,8 @@
 use std::borrow::Cow;
 use std::path::Path;
+use std::path::PathBuf;
 use std::sync::LazyLock;
+use std::time::Duration;
 
 use ratatui::layout::Flex;
 use ratatui::prelude::*;
@@ -21,6 +23,7 @@ use tui_widgets::scrollview::ScrollbarVisibility;
 use crate::config::Alarms;
 use crate::config::Config;
 use crate::config::Hooks;
+use crate::config::Percentage;
 use crate::config::PomodoroConfig;
 use crate::config::Timers;
 use crate::ui::prelude::*;
@@ -524,9 +527,9 @@ impl Updateable for SettingsModel {
     type Msg = SettingsMsg;
     type Cmd = SettingsCmd;
 
-    fn update(&mut self, msg: Self::Msg) -> Self::Cmd {
+    fn update(&mut self, msg: Self::Msg) -> Vec<Self::Cmd> {
         use SettingsMsg::*;
-        let mut cmd = SettingsCmd::None;
+        let mut cmds = vec![];
 
         match msg {
             SelectUp => self.select_up(),
@@ -537,16 +540,27 @@ impl Updateable for SettingsModel {
             ScrollUp => self.scroll_up(),
             ScrollDown => self.scroll_down(),
             CancelEditing => self.cancel_editing(),
-            TakeEditValue => {
-                cmd = SettingsCmd::EditValue(
-                    self.prompt.take().map(|v| v.text_state.value().to_string()),
+            SaveEdit => {
+                let value = self
+                    .prompt
+                    .take()
+                    .map(|v| v.text_state.value().to_string())
+                    .unwrap_or_default();
+                cmds.extend(
+                    self.cmd_from_edit(value, self.selected)
+                        .unwrap_or_else(|e| vec![e]),
                 );
+                self.update(CancelEditing);
             }
             SetUnsavedChanges(v) => self.has_unsaved_changes = v,
             SetShowKeybinds(v) => self.show_keybinds = v,
+            ToggleShowKeybinds => {
+                let new = !self.show_keybinds;
+                self.update(SettingsMsg::SetShowKeybinds(new));
+            }
         }
 
-        cmd
+        cmds
     }
 }
 
@@ -558,14 +572,6 @@ impl SettingsModel {
             prompt: None,
             has_unsaved_changes: false,
             show_keybinds: false,
-        }
-    }
-
-    pub fn take_edit_value(&mut self) -> String {
-        if let SettingsCmd::EditValue(Some(v)) = self.update(SettingsMsg::TakeEditValue) {
-            v
-        } else {
-            String::new()
         }
     }
 
@@ -593,11 +599,6 @@ impl SettingsModel {
 
     pub fn show_keybinds(&self) -> bool {
         self.show_keybinds
-    }
-
-    pub fn toggle_keybinds(&mut self) {
-        let new = !self.show_keybinds;
-        self.update(SettingsMsg::SetShowKeybinds(new));
     }
 
     pub fn start_editing_for_field(&mut self, config: &PomodoroConfig) {
@@ -691,6 +692,84 @@ impl SettingsModel {
     /// Cancel editing
     fn cancel_editing(&mut self) {
         self.prompt = None;
+    }
+
+    fn cmd_from_edit(
+        &mut self,
+        value: String,
+        selected: SettingsItem,
+    ) -> Result<Vec<SettingsCmd>, SettingsCmd> {
+        use ConfigMsg as C;
+        use SettingsItem as I;
+
+        let mut cmds: Vec<SettingsCmd> = vec![];
+
+        let conf_msg = match selected {
+            I::AutoStartOnLaunch => C::AutoStartOnLaunch,
+            I::TimerFocus => C::TimerFocus(self.parse_dur(value)?),
+            I::TimerShort => C::TimerShort(self.parse_dur(value)?),
+            I::TimerLong => C::TimerLong(self.parse_dur(value)?),
+            I::TimerLongInterval => {
+                C::TimerLongInterval(self.try_parse(value, |s| s.parse::<u32>(), "integer")?)
+            }
+            I::TimerAutoFocus => C::TimerAutoFocus,
+            I::TimerAutoShort => C::TimerAutoShort,
+            I::TimerAutoLong => C::TimerAutoLong,
+            I::HookFocus => C::HookFocus(value),
+            I::HookShort => C::HookShort(value),
+            I::HookLong => C::HookLong(value),
+            I::AlarmPathFocus => C::AlarmPathFocus(self.parse_path(value, &mut cmds)),
+            I::AlarmPathShort => C::AlarmPathShort(self.parse_path(value, &mut cmds)),
+            I::AlarmPathLong => C::AlarmPathLong(self.parse_path(value, &mut cmds)),
+            I::AlarmVolumeFocus => C::AlarmVolumeFocus(self.parse_vol(value)?),
+            I::AlarmVolumeShort => C::AlarmVolumeShort(self.parse_vol(value)?),
+            I::AlarmVolumeLong => C::AlarmVolumeLong(self.parse_vol(value)?),
+        };
+
+        cmds.push(SettingsCmd::SaveEdit(conf_msg));
+        Ok(cmds)
+    }
+
+    fn parse_path(&mut self, s: impl AsRef<str>, cmds: &mut Vec<SettingsCmd>) -> Option<PathBuf> {
+        let s = s.as_ref();
+        if s.is_empty() {
+            return None;
+        }
+        let path = PathBuf::from(s);
+        if !path.exists() {
+            cmds.push(SettingsCmd::ShowToast {
+                message: "Path does not exist".to_string(),
+                r#type: ToastType::Warning,
+            });
+        }
+        Some(path)
+    }
+
+    fn parse_dur(&mut self, s: impl AsRef<str>) -> Result<Duration, SettingsCmd> {
+        self.try_parse(s, |s| s.parse::<u64>(), "integer")
+            .map(|val| Duration::from_secs(val * 60))
+    }
+
+    fn parse_vol(&mut self, s: impl AsRef<str>) -> Result<Percentage, SettingsCmd> {
+        let s = s.as_ref();
+        if s.is_empty() {
+            Ok(Percentage::default())
+        } else {
+            self.try_parse(s, |s| Percentage::try_from(s), "percent")
+        }
+    }
+
+    fn try_parse<T, E: std::fmt::Debug>(
+        &mut self,
+        s: impl AsRef<str>,
+        f: impl for<'a> FnOnce(&'a str) -> Result<T, E>,
+        label: &str,
+    ) -> Result<T, SettingsCmd> {
+        let s = s.as_ref();
+        f(s).map_err(|e| SettingsCmd::ShowToast {
+            message: format!("Failed converting {s} to {label}: {e:?}"),
+            r#type: ToastType::Error,
+        })
     }
 }
 
