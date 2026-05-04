@@ -12,68 +12,53 @@ use tui_widgets::popup::Popup;
 use crate::model::Mode;
 use crate::model::Pomodoro;
 use crate::ui::prelude::*;
-use crate::ui::update::TimerCmd;
-use crate::ui::update::TimerMsg;
 use crate::utils;
 
-type State = TimerState;
-type Canvas<'a> = (Rect, &'a mut Buffer);
-type Buf<'a> = &'a mut Buffer;
-
-pub struct TuiTimerView {}
+pub struct TuiTimerView {
+    prompt_transition: bool,
+    show_keybinds: bool,
+}
 
 impl TuiTimerView {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            prompt_transition: false,
+            show_keybinds: false,
+        }
     }
-}
 
-pub struct TimerState {
-    pub model: TimerModel,
-    pub pomo: Pomodoro,
-}
+    pub fn render(&self, canvas: &mut Frame, state: &Pomodoro) {
+        let area = canvas.area();
+        let buf = canvas.buffer_mut();
 
-impl TimerState {
-    pub fn new(model: TimerModel, pomo: Pomodoro) -> Self {
-        Self { model, pomo }
-    }
-}
+        let show_binds = self.show_keybinds();
 
-impl StatefulViewRef<Canvas<'_>> for TuiTimerView {
-    type State = State;
-    type Result = ();
-
-    fn render_stateful_ref(&self, canvas: Canvas, state: &mut Self::State) -> Self::Result {
-        let (area, buf) = canvas;
-        let TimerState { model, pomo } = state;
-        let show_binds = model.show_keybinds();
-
-        let mode = pomo.mode();
-        let timer = pomo.remaining_time();
-        let paused = !pomo.is_running();
-        let progress = pomo.progress();
+        let mode = state.mode();
+        let remaining = state.remaining_time();
+        let paused = !state.is_running();
+        let progress = state.progress();
 
         let rows = LAYOUT.split(area);
 
         self.state(rows[1], buf, mode, paused);
-        self.timer(rows[3], buf, &timer, mode);
+        self.timer(rows[3], buf, &remaining, mode);
         self.progress_bar(rows[4], buf, progress, mode);
         self.stats(
             rows[6],
             buf,
-            pomo.long_interval(),
-            pomo.total_sessions(),
-            pomo.focus_sessions(),
+            state.long_interval(),
+            state.total_sessions(),
+            state.focus_sessions(),
         );
         self.keybinds(rows[8], buf, show_binds);
-        self.prompt(area, buf, model, pomo);
+        self.prompt(area, buf, state);
     }
 }
 
 impl TuiTimerView {
     // Render popup if prompt is active
-    fn prompt(&self, area: Rect, buf: Buf, model: &TimerModel, pomo: &Pomodoro) {
-        if model.prompt_transition() {
+    fn prompt(&self, area: Rect, buf: &mut Buffer, pomo: &Pomodoro) {
+        if self.prompt_transition() {
             let next = pomo.next_mode().to_string().to_lowercase();
             let body = Text::from(vec![
                 Line::from(""),
@@ -111,7 +96,7 @@ impl TuiTimerView {
         }
     }
 
-    fn state(&self, area: Rect, buf: Buf, mode: Mode, paused: bool) {
+    fn state(&self, area: Rect, buf: &mut Buffer, mode: Mode, paused: bool) {
         let (label, label_width) = &STATE_LABELS[&mode];
         let color = mode.into();
         let center = Alignment::Center;
@@ -137,7 +122,7 @@ impl TuiTimerView {
         }
     }
 
-    fn timer(&self, area: Rect, buf: Buf, remaining: &Duration, color: impl Into<Color>) {
+    fn timer(&self, area: Rect, buf: &mut Buffer, remaining: &Duration, color: impl Into<Color>) {
         let time_str = format_duration_clock(remaining);
         let ascii = utils::ascii_mono12(&time_str);
         let width = utils::string_width(&ascii) as u16;
@@ -154,7 +139,7 @@ impl TuiTimerView {
             .render(area, buf);
     }
 
-    fn progress_bar(&self, area: Rect, buf: Buf, progress: f64, color: impl Into<Color>) {
+    fn progress_bar(&self, area: Rect, buf: &mut Buffer, progress: f64, color: impl Into<Color>) {
         let layout = Layout::horizontal([Constraint::Length(55)]).flex(Flex::Center);
         let area = area.layout::<1>(&layout)[0];
 
@@ -168,7 +153,7 @@ impl TuiTimerView {
     fn stats(
         &self,
         area: Rect,
-        buf: Buf,
+        buf: &mut Buffer,
         long_interval: u32,
         total_sessions: u32,
         focus_sessions: u32,
@@ -189,7 +174,7 @@ impl TuiTimerView {
             .render(area, buf);
     }
 
-    fn keybinds(&self, area: Rect, buf: Buf, show: bool) {
+    fn keybinds(&self, area: Rect, buf: &mut Buffer, show: bool) {
         if show {
             KEYBINDS_ON.clone().render(area, buf);
         } else {
@@ -296,27 +281,19 @@ static KEYBINDS_OFF: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
     Paragraph::new(line).alignment(Alignment::Center)
 });
 
-#[derive(Debug, PartialEq, Eq, Default)]
-pub struct TimerModel {
-    prompt_transition: bool,
-    show_keybinds: bool,
-}
-
-impl Updateable for TimerModel {
-    type Msg = TimerMsg;
-    type Cmd = TimerCmd;
-
-    fn update(&mut self, msg: Self::Msg) -> Vec<Self::Cmd> {
+impl Updateable<TimerMsg, TimerCmd> for TuiTimerView {
+    fn update(&mut self, msg: TimerMsg) -> Vec<TimerCmd> {
         use TimerMsg::*;
         let mut ret = vec![];
         match msg {
-            SetPromptNextSession(v) => self.prompt_transition = v,
+            SetPromptTransition(v) => self.prompt_transition = v,
             PromptNextSessionAnswerYes(v) => {
                 if v {
                     ret.push(TimerCmd::PromptTransitionAnsweredYes)
                 } else {
                     ret.push(TimerCmd::PromptTransitionAnsweredNo)
                 }
+                self.prompt_transition = false
             }
             SetShowKeybinds(v) => self.show_keybinds = v,
             ToggleShowKeybinds => {
@@ -329,11 +306,7 @@ impl Updateable for TimerModel {
     }
 }
 
-impl TimerModel {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
+impl TuiTimerView {
     pub fn prompt_transition(&self) -> bool {
         self.prompt_transition
     }

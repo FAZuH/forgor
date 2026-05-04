@@ -9,9 +9,17 @@ use tomo::error::AppError;
 use tomo::log::setup_logging;
 use tomo::model::Pomodoro;
 use tomo::repo::Repos;
+use tomo::service::DesktopNotifyService;
+use tomo::service::NotifyService;
 use tomo::service::SoundService;
 use tomo::service::alarm::AlarmService;
 use tomo::ui::Runner;
+use tomo::ui::runtime::Runtime;
+
+type Repo = Box<dyn Repos>;
+type Sound = Box<dyn SoundService<SoundType = Alarm>>;
+type Notify = Box<dyn NotifyService>;
+type View = Box<dyn Runner>;
 
 fn main() -> Result<(), AppError> {
     let cli = Cli::parse();
@@ -21,32 +29,31 @@ fn main() -> Result<(), AppError> {
     info!("initializing {} v{}", tomo::APP_NAME, tomo::APP_VERSION);
 
     let repo = repo(&conf.db_path);
-    let alarm = alarm();
+    let sound = alarm();
+    let notify = notify();
     let pomo = pomodoro(&cli, &conf);
 
     repo.session().close_all_sessions().unwrap();
 
-    let mut view = runner(conf, pomo, alarm, repo);
+    let mut runner = view(conf, repo, sound, notify, pomo);
     info!("starting view");
-    view.run().unwrap();
-
+    runner.run().unwrap();
     Ok(())
 }
 
-fn runner<'b>(
-    conf: Config,
-    pomo: Pomodoro,
-    alarm: Box<dyn SoundService<SoundType = Alarm> + 'static>,
-    repo: Box<dyn Repos>,
-) -> Box<dyn Runner + 'b> {
+fn view(conf: Config, repo: Repo, sound: Sound, notify: Notify, pomo: Pomodoro) -> View {
+    use tomo::ui::core::AppCore;
+    use tomo::ui::tui::TuiEffectHandler;
     use tomo::ui::tui::TuiRunner;
-    use tomo::ui::tui::view::TuiView;
 
-    let view = Box::new(TuiView::new());
-    Box::new(TuiRunner::new(pomo, conf, view, alarm, repo).unwrap())
+    let effect_handler = TuiEffectHandler::new(sound, notify, repo);
+    let core = AppCore::new(pomo, conf);
+    let runtime = Runtime::new(core, effect_handler);
+
+    Box::new(TuiRunner::new(runtime).unwrap())
 }
 
-fn repo(path: &Path) -> Box<dyn Repos> {
+fn repo(path: &Path) -> Repo {
     use tomo::repo::sqlite::SqliteDb;
     use tomo::repo::sqlite::SqliteRepos;
 
@@ -67,7 +74,11 @@ fn pomodoro(cli: &Cli, conf: &Config) -> Pomodoro {
     Pomodoro::new(focus, long_break, short_break, long_interval)
 }
 
-fn alarm() -> Box<dyn SoundService<SoundType = Alarm>> {
+fn alarm() -> Sound {
     let alarm = AlarmService::new();
     Box::new(alarm)
+}
+
+fn notify() -> Notify {
+    Box::new(DesktopNotifyService)
 }

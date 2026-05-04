@@ -15,36 +15,80 @@ classDiagram
         <<trait>>
         +type Msg
         +type Cmd
-        +update(&mut self, msg: Msg) Cmd
+        +update(&mut self, msg: Msg) Vec~Cmd~
     }
 
-    class View~C~:::view {
+    class EffectHandler:::effect {
         <<trait>>
-        +type Result
-        +render(self, canvas: C) Result
+        +execute(&mut self, cmd: Cmd) Vec~Msg~
     }
 
-    class ViewRef~C~:::view {
-        <<trait>>
-        +type Result
-        +render_ref(&self, canvas: C) Result
-        +render_mut(&mut self, canvas: C) Result
+    class Runtime~E~:::controller {
+        -core: AppCore
+        -effects: E
+        +new(core: AppCore, effects: E)
+        +dispatch(&mut self, msg: Msg)
+        +core() &AppCore
+        +core_mut() &mut AppCore
+        +effects() &E
+        +effects_mut() &mut E
+        +split_mut() (&mut AppCore, &mut E)
     }
 
-    class StatefulView~C~:::view {
-        <<trait>>
-        +type State
-        +type Result
-        +render_stateful(self, canvas: C, state: &mut State) Result
+    class AppCore:::model {
+        -pomodoro: Pomodoro
+        -timer_model: TimerModel
+        -settings_model: SettingsModel
+        -config: Config
+        -router: Router
+        -active_session_id: Option~i32~
+        -config_snapshot: Option~Config~
+        +new(pomo, config)
+        +update(&mut self, msg: Msg) Vec~Cmd~
+        +router() &Router
+        +pomodoro() &Pomodoro
+        +timer_model() &TimerModel
+        +settings_model() &SettingsModel
+        +settings_model_mut() &mut SettingsModel
+        +config() &Config
     }
 
-    class StatefulViewRef~C~:::view {
-        <<trait>>
-        +type State
-        +type Result
-        +render_stateful_ref(&self, canvas: C, state: &mut State) Result
-        +render_stateful_mut(&mut self, canvas: C, state: &mut State) Result
+    class Msg:::action {
+        <<enumeration>>
+        Pomodoro(PomodoroMsg)
+        Timer(TimerMsg)
+        Settings(SettingsMsg)
+        Tick
+        Quit
+        SessionCreated(i32)
+        SessionUpdated
+        SessionEnded
+        SessionsClosed
+        ConfigSaved(ConfigSaveResult)
+        NotificationSent(Result)
     }
+
+    class Cmd:::action {
+        <<enumeration>>
+        PlaySound(Alarm)
+        StopSound
+        SendNotification(Mode)
+        NewSession(Option~i32~, PomodoroState)
+        UpdateSession(i32)
+        EndSession(i32)
+        CloseAllSessions
+        SaveConfig(Box~Config~)
+        RunHook(String)
+        ShowToast(String, ToastType)
+        None
+    }
+
+    Runtime *-- AppCore
+    Runtime *-- EffectHandler
+    AppCore ..> Msg : receives
+    AppCore ..> Cmd : produces
+    EffectHandler ..> Cmd : receives
+    EffectHandler ..> Msg : produces
 
     class Page:::action {
         <<enumeration>>
@@ -76,16 +120,21 @@ classDiagram
             TogglePause
             SkipSession
             ResetSession
-            TickAutoNext(bool)
-            NextState
+            Tick
+            NextSession
+            Start
+            StartPaused
         }
 
         class PomodoroCmd:::action {
             <<enumeration>>
-            None
-            PromptNextSession
+            Started
+            StartedPaused
+            SessionEnd
             NextSession
-            SessionContinued
+            SessionPaused
+            SessionResumed
+            SessionSkipped
         }
     }
 
@@ -225,6 +274,10 @@ classDiagram
     Config ..> ConfigMsg : receives
     Config ..> ConfigCmd : produces
 
+    AppCore *-- Pomodoro
+    AppCore *-- Config
+    AppCore *-- Router
+
     Router --> Page : active_page
     Router --> Navigation : handles
 
@@ -240,6 +293,7 @@ classDiagram
     classDef controller fill:#bbdefb,stroke:#1565c0,stroke-width:2px,color:#000
     classDef state fill:#fff9c4,stroke:#fbc02d,stroke-width:2px,color:#000
     classDef renderCmd fill:#ffccbc,stroke:#d84315,stroke-width:2px,color:#000
+    classDef effect fill:#ffccbc,stroke:#d84315,stroke-width:2px,color:#000
     classDef model fill:#e1bee7,stroke:#6a1b9a,stroke-width:2px,color:#000
     classDef action fill:#cfd8dc,stroke:#455a64,stroke-width:2px,color:#000
     classDef error fill:#ffcdd2,stroke:#c62828,stroke-width:2px,color:#000

@@ -2,21 +2,18 @@ sequenceDiagram
     autonumber
     participant U as User
     participant R as TuiRunner
-    participant TH as TickHandler
-    participant P as Pomodoro
-    participant C as Config
+    participant TH as TickTimer
+    participant RT as Runtime
+    participant AC as AppCore
+    participant EH as TuiEffectHandler
     participant V as TuiView
-    participant T as ToastHandler
-    participant S as SoundService
+    participant S as External Services (Sound/Notify/DB)
 
     rect rgb(180, 200, 220)
         note right of R: INITIALIZATION
-        R->>R: Router::new(Page::Timer)
         R->>V: TuiView::new()
-        activate V
-        V-->>R: view
-        deactivate V
-        R->>R: snapshot_settings()
+        R->>RT: Runtime::new(core, effect_handler)
+        R->>R: TuiRunner::new(runtime, view)
     end
 
     rect rgb(180, 220, 190)
@@ -25,75 +22,56 @@ sequenceDiagram
             R->>TH: new_tick()
             TH-->>R: tick_elapsed?
 
+            opt On Tick
+                R->>RT: dispatch(Msg::Tick)
+            end
+
             opt Has Input
+                U->>R: key event
                 alt Page::Timer
                     R->>R: handle_timer(event)
-                    opt prompt_transition
-                        R->>R: handle_timer_transition(event)
-                        alt Enter / 'y'
-                            R->>R: transition()
-                            R->>R: update_timer(SetPromptNextSession(false))
-                        else Esc / 'n'
-                            R->>R: quit()
-                        end
-                    end
-                    R->>P: update(PomodoroMsg)
-                    activate P
-                    P-->>R: PomodoroCmd
-                    deactivate P
-                    R->>R: handle_pomodoro_cmd(cmd)
+                    R->>RT: dispatch(PomodoroMsg)
                 else Page::Settings
                     R->>R: handle_settings(event)
-                    alt Is Editing
-                        R->>R: handle_settings_edit(event)
-                        alt Prompt Done
-                            R->>R: apply_settings_edit()
-                            R->>R: update_settings(CancelEditing)
-                            R->>C: update(ConfigMsg)
-                            activate C
-                            C-->>R: ConfigCmd
-                            deactivate C
-                            R->>R: update_settings(SetUnsavedChanges(bool))
-                        else Prompt Aborted
-                            R->>R: update_settings(CancelEditing)
-                        end
-                    else Is Navigating
-                        R->>R: update_settings(SettingsMsg)
-                    end
+                    R->>RT: dispatch(SettingsMsg)
                 end
                 R->>R: redraw = true
             end
 
-            opt Redraw
-                R->>R: tick()
-                R->>P: update(Tick { auto_next })
-                activate P
-                P-->>R: PomodoroCmd
-                deactivate P
-                R->>R: handle_pomodoro_cmd(cmd)
+            opt Inside Runtime dispatch
+                activate RT
+                loop Until Msg queue empty
+                    RT->>AC: update(Msg)
+                    activate AC
+                    AC-->>RT: Vec~Cmd~
+                    deactivate AC
 
-                opt PomodoroCmd::PromptNextSession
-                    R->>R: on_session_end()
-                    R->>R: update_timer(SetPromptNextSession(true))
+                    loop For each Cmd
+                        RT->>EH: execute(Cmd)
+                        activate EH
+                        
+                        alt PlaySound / SaveConfig / RunHook
+                            EH->>S: trigger side-effect
+                        else ShowToast
+                            EH->>EH: toast_handler.show()
+                        end
+
+                        EH-->>RT: Vec~Msg~ (queue results)
+                        deactivate EH
+                    end
                 end
-
-                opt PomodoroCmd::NextSession
-                    R->>R: on_session_end()
-                    R->>S: play_sound(next_mode)
-                    R->>R: send_notification(next_mode)
-                    R->>R: run_hooks(hooks, curr_mode)
-                    R->>R: transition()
-                end
-
-                R->>V: render_stateful_ref(frame, canvas, state)
-                activate V
-                V-->>R: frame drawn
-                deactivate V
-                R->>T: tick()
-                R->>T: render(area, buffer)
-                R->>R: terminal.draw()
+                deactivate RT
             end
 
-            R->>R: sleep(10ms)
+            opt Redraw
+                R->>V: render(frame, core, settings_vs)
+                activate V
+                V-->>R: rendered to frame
+                deactivate V
+                
+                R->>EH: toast_mut().tick()
+                R->>EH: toast_mut().render(frame)
+                R->>R: terminal.draw()
+            end
         end
     end
