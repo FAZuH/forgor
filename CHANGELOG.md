@@ -1,3 +1,18 @@
+## 0.2.4 (2026-05-05)
+
+
+### New Features
+
+* Add -c/--config-path argument ([bb51ecd](https://github.com/FAZuH/tomo/commit/bb51ecddfb1f84ba250766ed70f06261051577eb))
+* Add session tracking ([c7f7a97](https://github.com/FAZuH/tomo/commit/c7f7a97ae0977f8fc411a437f67b279aee34c1f6))
+* Add settings copy and paste keybinds ([c2fb9b5](https://github.com/FAZuH/tomo/commit/c2fb9b52b3398ecb8f231c559a8d9f5a80e60b51)), closes [#33](https://github.com/FAZuH/tomo/issues/33)
+* Add stop alarm keybind ([110c33b](https://github.com/FAZuH/tomo/commit/110c33b9171c144fd0c58f5bdb7f89b41dcf1a2c))
+* Add stop alarm keybind hint ([77ea64c](https://github.com/FAZuH/tomo/commit/77ea64c26c44f1ea7022ee2e02582b668e2d87d8))
+* Improve crash handling ([f4013e7](https://github.com/FAZuH/tomo/commit/f4013e7d38ee2cda5ae5be20c72ff1435d4dcba4))
+* Improve crash handling ([18a7d1a](https://github.com/FAZuH/tomo/commit/18a7d1a633d319c40ee905d391a2c8589546851c))
+* Show paused duration ([5f975d7](https://github.com/FAZuH/tomo/commit/5f975d729b00a773c0493e3eeb0b12946ffcf8a8)), closes [#38](https://github.com/FAZuH/tomo/issues/38)
+* Show remaining focus sessions before a long break ([dcd4cd3](https://github.com/FAZuH/tomo/commit/dcd4cd3927332da81b0028826ea96ccc1da2f8a2)), closes [#39](https://github.com/FAZuH/tomo/issues/39)
+
 ## 0.2.3 (2026-05-01)
 
 
@@ -29,7 +44,7 @@
 
 ### Performance Improvements
 
-* Previously the loop has to wait 1 tick before initial drawing to the terminal. Reordered the operation so on start the terminal is drawn first. ([99c9bc5](https://github.com/FAZuH/tomo/commit/99c9bc5e7e3858a36bf1c0150ecff9636a5adea0))
+* Improve initial draw speed ([99c9bc5](https://github.com/FAZuH/tomo/commit/99c9bc5e7e3858a36bf1c0150ecff9636a5adea0))
 
 ## 0.2.1 (2026-05-01)
 
@@ -47,7 +62,7 @@
 
 * Alarm volume settings showing alarm path when editing ([1a389a9](https://github.com/FAZuH/tomo/commit/1a389a914127bc3cb32a387ae67c4148428d1363))
 * Crash when toast exceeds frame height ([1de1a29](https://github.com/FAZuH/tomo/commit/1de1a2942819df43eb8e4cbc9d753786a333dc40))
-* Fix toasts deduplication counter not appearing in the render. Fix toasts being hidden without taking account of deduplication update. ([8c098d2](https://github.com/FAZuH/tomo/commit/8c098d2e53ca6ded0257bb8f42301e7f445da3df))
+* Fix toast deduplication issues ([8c098d2](https://github.com/FAZuH/tomo/commit/8c098d2e53ca6ded0257bb8f42301e7f445da3df))
 
 
 ### New Features
@@ -63,19 +78,4 @@
 * Make settings checkbox label dim ([08f8dcd](https://github.com/FAZuH/tomo/commit/08f8dcdf3b65a07c54b889f2e6bee24b33b1aa92))
 * Make timer shortcut toggleable ([8900478](https://github.com/FAZuH/tomo/commit/8900478530b941b3d986099d914814c3bd5784b4))
 * Trim percent when editing alarm volume ([83a47ec](https://github.com/FAZuH/tomo/commit/83a47ecee1437bec36c7bad6229306bd8a636bb0))
-
-## 0.1.7 (2026-04-28)
-
-
-### New Features
-
-* Add input validation to settings page ([679f389](https://github.com/FAZuH/tomo/commit/679f38962062174b135a05d812a3fde24449372d)), closes [#23](https://github.com/FAZuH/tomo/issues/23)
-* Add numerous keybindings for field input mode. Check all supported keybindings at https://docs.rs/tui-prompts/latest/tui_prompts/#key-bindings ([05c1845](https://github.com/FAZuH/tomo/commit/05c18453f30e4731b4adfd40bd9571eb1d44dd25)), closes [#21](https://github.com/FAZuH/tomo/issues/21)
-* Add scroll input handling for settings page ([5a5f24a](https://github.com/FAZuH/tomo/commit/5a5f24a96f756166e28da81d184ad1af86126dac)), closes [#20](https://github.com/FAZuH/tomo/issues/20)
-* Add warning/error toasts ([145dd17](https://github.com/FAZuH/tomo/commit/145dd172c91c512a104ee21a5a398b73a6b21fdb))
-
-
-### Performance Improvements
-
-* Mutate state models in-place, instead of creating a clone every state update. ([a9d19ce](https://github.com/FAZuH/tomo/commit/a9d19ce3f2cfa6dd9ccd96f65a08e70834201b93))
 
