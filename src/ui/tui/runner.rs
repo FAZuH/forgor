@@ -9,6 +9,7 @@ use tui_widgets::prompts::State;
 use tui_widgets::prompts::Status;
 
 use crate::ui::UiError;
+use crate::ui::core::Cmd;
 use crate::ui::core::Msg;
 use crate::ui::prelude::*;
 use crate::ui::runtime::Runtime;
@@ -159,6 +160,7 @@ impl TuiRunner {
                         continue;
                     }
                 }
+                self.common_handler(&event);
                 match self.runtime.core().router().active_page() {
                     Some(Page::Settings) => self.handle_settings(event),
                     Some(Page::Timer) => self.handle_timer(event),
@@ -167,6 +169,14 @@ impl TuiRunner {
             }
         }
         Ok(())
+    }
+
+    fn common_handler(&mut self, event: &Event) {
+        if let Event::Key(key) = event
+            && let KeyCode::Char('m') = key.code
+        {
+            self.runtime.execute_effect(Cmd::StopSound)
+        }
     }
 
     fn handle_timer(&mut self, event: Event) {
