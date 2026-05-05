@@ -6,6 +6,7 @@ use strum::EnumCount;
 use strum::EnumDiscriminants;
 use strum::EnumIter;
 use strum::EnumMessage;
+use strum::EnumProperty;
 use strum::FromRepr;
 use strum::IntoStaticStr;
 use strum::VariantArray;
@@ -23,57 +24,113 @@ use crate::ui::prelude::*;
     EnumCount,
     EnumIter,
     EnumMessage,
+    EnumProperty,
     VariantArray,
 ))]
 #[strum_discriminants(name(SettingsItem))]
 pub enum ConfigMsg {
     // Timer section
-    #[strum(message = "Focus", detailed_message = "Focus Duration")]
+    #[strum(
+        message = "Focus",
+        detailed_message = "Focus Duration",
+        props(description = "Duration of the main focus session in minutes.")
+    )]
     TimerFocus(Duration),
-    #[strum(message = "Short Break", detailed_message = "Short Break Duration")]
+    #[strum(
+        message = "Short Break",
+        detailed_message = "Short Break Duration",
+        props(description = "Duration of a short break in minutes.")
+    )]
     TimerShort(Duration),
-    #[strum(message = "Long Break", detailed_message = "Long Break Duration")]
+    #[strum(
+        message = "Long Break",
+        detailed_message = "Long Break Duration",
+        props(description = "Duration of a long break in minutes.")
+    )]
     TimerLong(Duration),
     #[strum(
         message = "Long Break Interval",
-        detailed_message = "Long Break Interval"
+        detailed_message = "Long Break Interval",
+        props(description = "Number of focus sessions before a long break.")
     )]
     TimerLongInterval(u32),
-    #[strum(message = "Auto-start on Launch")]
+    #[strum(
+        message = "Auto-start on Launch",
+        props(description = "Automatically start the timer when the application launches.")
+    )]
     AutoStartOnLaunch,
-    #[strum(message = "Focus")]
+    #[strum(
+        message = "Focus",
+        props(description = "Automatically start the next focus session after a break.")
+    )]
     TimerAutoFocus,
-    #[strum(message = "Short Break")]
+    #[strum(
+        message = "Short Break",
+        props(description = "Automatically start a short break after a focus session.")
+    )]
     TimerAutoShort,
-    #[strum(message = "Long Break")]
+    #[strum(
+        message = "Long Break",
+        props(description = "Automatically start a long break when the interval is reached.")
+    )]
     TimerAutoLong,
 
     // Hook section
-    #[strum(message = "Focus", detailed_message = "Focus Hook Command")]
+    #[strum(
+        message = "Focus",
+        detailed_message = "Focus Hook Command",
+        props(description = "Shell command to execute when a focus session starts.")
+    )]
     HookFocus(String),
-    #[strum(message = "Short Break", detailed_message = "Short Break Hook Command")]
+    #[strum(
+        message = "Short Break",
+        detailed_message = "Short Break Hook Command",
+        props(description = "Shell command to execute when a short break starts.")
+    )]
     HookShort(String),
-    #[strum(message = "Long Break", detailed_message = "Long Break Hook Command")]
+    #[strum(
+        message = "Long Break",
+        detailed_message = "Long Break Hook Command",
+        props(description = "Shell command to execute when a long break starts.")
+    )]
     HookLong(String),
 
     // Alarm section
-    #[strum(message = "Focus", detailed_message = "Focus Alarm Sound File Path")]
+    #[strum(
+        message = "Focus",
+        detailed_message = "Focus Alarm Sound File Path",
+        props(description = "Path to the audio file played when a focus session ends.")
+    )]
     AlarmPathFocus(Option<PathBuf>),
     #[strum(
         message = "Short Break",
-        detailed_message = "Short Break Alarm Sound File Path"
+        detailed_message = "Short Break Alarm Sound File Path",
+        props(description = "Path to the audio file played when a short break ends.")
     )]
     AlarmPathShort(Option<PathBuf>),
     #[strum(
         message = "Long Break",
-        detailed_message = "Long Break Alarm Sound File Path"
+        detailed_message = "Long Break Alarm Sound File Path",
+        props(description = "Path to the audio file played when a long break ends.")
     )]
     AlarmPathLong(Option<PathBuf>),
-    #[strum(message = "Focus", detailed_message = "Focus Alarm Volume")]
+    #[strum(
+        message = "Focus",
+        detailed_message = "Focus Alarm Volume",
+        props(description = "Volume level (0-100) for the focus alarm.")
+    )]
     AlarmVolumeFocus(Percentage),
-    #[strum(message = "Short Break", detailed_message = "Short Break Alarm Volume")]
+    #[strum(
+        message = "Short Break",
+        detailed_message = "Short Break Alarm Volume",
+        props(description = "Volume level (0-100) for the short break alarm.")
+    )]
     AlarmVolumeShort(Percentage),
-    #[strum(message = "Long Break", detailed_message = "Long Break Alarm Volume")]
+    #[strum(
+        message = "Long Break",
+        detailed_message = "Long Break Alarm Volume",
+        props(description = "Volume level (0-100) for the long break alarm.")
+    )]
     AlarmVolumeLong(Percentage),
 }
 
@@ -155,6 +212,10 @@ impl SettingsItem {
 
     pub fn label_long(&self) -> &'static str {
         self.config_msg().get_detailed_message().unwrap()
+    }
+
+    pub fn description(&self) -> &'static str {
+        self.get_str("description").unwrap_or("")
     }
 
     fn config_msg(&self) -> ConfigMsg {

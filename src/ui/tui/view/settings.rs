@@ -49,9 +49,13 @@ impl TuiSettingsView {
         let area = canvas.area();
         let buf = canvas.buffer_mut();
 
-        // Split area for scroll view and help bar
-        let [content_area, help_area] =
-            Layout::vertical([Constraint::Fill(1), Constraint::Length(3)]).areas(area);
+        // Split area for scroll view, description panel, and help bar
+        let [content_area, desc_area, help_area] = Layout::vertical([
+            Constraint::Fill(1),
+            Constraint::Length(4),
+            Constraint::Length(3),
+        ])
+        .areas(area);
 
         // Reserve space for scrollbar and padding
         let content_width = content_area.width.saturating_sub(2).max(46);
@@ -81,6 +85,20 @@ impl TuiSettingsView {
         }
 
         scroll_view.render(content_area, buf, self.scroll_state_mut());
+
+        // Render description block
+        let desc_text = self.selected().description();
+        let desc_block = Block::default()
+            .title(" Description ")
+            .borders(Borders::ALL)
+            .border_type(ratatui::widgets::BorderType::Rounded)
+            .border_style(Style::default().fg(Color::DarkGray));
+
+        Paragraph::new(desc_text)
+            .block(desc_block)
+            .wrap(ratatui::widgets::Wrap { trim: true })
+            .style(Style::default().fg(Color::Gray))
+            .render(desc_area, buf);
 
         // Render help bar at bottom
         self.keybinds(help_area, buf, self.show_keybinds());

@@ -166,10 +166,9 @@ impl TuiRunner {
 
     fn common_handler(&mut self, event: &Event) {
         match event {
-            Event::Key(key)
-                if key.code == KeyCode::Char('m') => {
-                    self.core.execute_effect(Cmd::StopSound)
-                }
+            Event::Key(key) if key.code == KeyCode::Char('m') => {
+                self.core.execute_effect(Cmd::StopSound)
+            }
             Event::Resize(..) => self.redraw(),
             _ => {}
         }
