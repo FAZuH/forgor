@@ -3,6 +3,7 @@ pub mod cmd_runner;
 pub mod notify;
 pub mod traits;
 
+pub use notify::DesktopNotifyService;
 use rodio::DeviceSinkError;
 pub use traits::*;
 

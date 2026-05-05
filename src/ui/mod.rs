@@ -1,4 +1,4 @@
-pub mod model;
+pub mod core;
 pub mod prelude;
 pub mod router;
 pub mod traits;

@@ -35,7 +35,6 @@ classDiagram
     class PomodoroError {
         +Running
         +NotRunning
-        +UnexpectedState(String)
     }
 
     class SoundError {
@@ -54,12 +53,3 @@ classDiagram
     AppError ..> InvalidState
 
     UiError ..> TuiError
-
-    TuiError ..> Io
-
-    PomodoroError ..> UnexpectedState
-
-    SoundError ..> DeviceSinkError
-    SoundError ..> Decode
-
-    RepoError ..> Connection

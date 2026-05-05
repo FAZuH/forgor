@@ -1,7 +1,8 @@
 use notify_rust::Notification;
 use notify_rust::{self};
 
-use crate::model::pomodoro::Mode;
+use crate::model::Mode;
+use crate::service::NotifyService;
 
 impl From<Mode> for Notification {
     fn from(value: Mode) -> Self {
@@ -17,7 +18,11 @@ impl From<Mode> for Notification {
     }
 }
 
-pub fn notify(notifiable: impl Into<Notification>) -> Result<(), notify_rust::error::Error> {
-    notifiable.into().show()?;
-    Ok(())
+pub struct DesktopNotifyService;
+
+impl NotifyService for DesktopNotifyService {
+    fn send(&mut self, mode: Mode) -> Result<(), String> {
+        let notification: Notification = mode.into();
+        notification.show().map(|_| ()).map_err(|e| e.to_string())
+    }
 }

@@ -1,4 +1,5 @@
 use std::num::ParseFloatError;
+use std::path::PathBuf;
 use std::time::Duration;
 
 use clap::Parser;
@@ -17,6 +18,9 @@ pub struct Cli {
 
     #[arg(short = 'L', long, value_parser = |a: &str| a.parse::<u32>())]
     pub long_interval: Option<u32>,
+
+    #[arg(short, long)]
+    pub config_path: Option<PathBuf>,
 }
 
 #[derive(Debug, thiserror::Error)]

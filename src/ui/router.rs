@@ -1,3 +1,5 @@
+use crate::ui::traits::Updateable;
+
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
 pub enum Page {
     Timer,
@@ -5,13 +7,18 @@ pub enum Page {
 }
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
-pub enum Navigation {
+pub enum RouterMsg {
     Quit,
     Stay,
     GoTo(Page),
 }
 
-impl From<Page> for Navigation {
+#[derive(Clone, Debug, Copy, PartialEq, Eq)]
+pub enum RouterCmd {
+    Quit,
+}
+
+impl From<Page> for RouterMsg {
     fn from(value: Page) -> Self {
         Self::GoTo(value)
     }
@@ -29,14 +36,6 @@ impl Router {
         }
     }
 
-    pub fn navigate(&mut self, nav: impl Into<Navigation>) {
-        match nav.into() {
-            Navigation::Quit => self.active_page = None,
-            Navigation::Stay => {}
-            Navigation::GoTo(page) => self.active_page = Some(page),
-        }
-    }
-
     pub fn quit(&mut self) {
         self.active_page = None
     }
@@ -47,6 +46,21 @@ impl Router {
 
     pub fn is_quit(&self) -> bool {
         self.active_page.is_none()
+    }
+}
+
+impl Updateable<RouterMsg, RouterCmd> for Router {
+    fn update(&mut self, msg: RouterMsg) -> Vec<RouterCmd> {
+        let mut ret = vec![];
+        match msg {
+            RouterMsg::Quit => {
+                self.active_page = None;
+                ret.push(RouterCmd::Quit)
+            }
+            RouterMsg::Stay => {}
+            RouterMsg::GoTo(page) => self.active_page = Some(page),
+        }
+        ret
     }
 }
 
@@ -67,7 +81,7 @@ mod tests {
         let mut router = Router::new(Page::Timer);
         assert_eq!(router.active_page(), Some(Page::Timer));
 
-        router.navigate(Page::Settings);
+        router.update(RouterMsg::GoTo(Page::Settings));
         assert_eq!(router.active_page(), Some(Page::Settings));
     }
 }

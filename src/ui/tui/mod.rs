@@ -1,8 +1,10 @@
 pub mod backend;
+pub mod effect;
 pub mod runner;
-pub mod toasts;
+pub mod toast;
 pub mod view;
 
+pub use effect::TuiEffectHandler;
 pub use runner::TuiRunner;
 
 #[derive(Debug, thiserror::Error)]

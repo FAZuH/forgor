@@ -7,3 +7,4 @@ Commits follow
 - `gui`: GUI
 - `core`: Core business logic
 - `db`: Database
+- `cli`: CLI commands

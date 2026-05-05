@@ -28,6 +28,8 @@ pub struct Pomodoro {
     /// Remaining time frozen at pause, or session duration at start/reset.
     /// When running, actual remaining is `frozen_remaining - anchor.elapsed()`.
     frozen_remaining: Duration,
+
+    paused_at: Option<Instant>,
 }
 
 impl Pomodoro {
@@ -80,6 +82,7 @@ impl Pomodoro {
         if let Some(anchor) = self.anchor {
             self.accumulated += anchor.elapsed();
         }
+        self.paused_at = Some(Instant::now());
         self.anchor = None;
         Ok(())
     }
@@ -92,6 +95,7 @@ impl Pomodoro {
     pub fn resume(&mut self) -> Result<(), PomodoroError> {
         self.check_not_running()?;
         self.running = true;
+        self.paused_at = None;
         self.anchor = Some(Instant::now());
         Ok(())
     }
@@ -104,6 +108,10 @@ impl Pomodoro {
         } else {
             self.resume().unwrap()
         }
+    }
+
+    pub fn paused_at(&self) -> Option<Instant> {
+        self.paused_at
     }
 
     /// Skips to the next session.
@@ -163,6 +171,11 @@ impl Pomodoro {
         self.long_interval
     }
 
+    /// Remaining focus sessions before a long interval session
+    pub fn before_long_break(&self) -> u32 {
+        self.long_interval() - (self.focus_sessions % self.long_interval())
+    }
+
     /// Gets session duration based on current mode.
     pub fn session_duration(&self) -> Duration {
         match self.mode {
@@ -206,6 +219,7 @@ impl Pomodoro {
         } else {
             None
         };
+        self.paused_at = None;
     }
 
     /// Returns [`PomodoroError::NotRunning`] if session is not running yet.
@@ -239,25 +253,19 @@ impl Default for Pomodoro {
             running: false,
             frozen_remaining: Duration::from_mins(25),
             anchor: None,
+            paused_at: None,
         }
     }
 }
 
-#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash, strum::Display)]
 pub enum Mode {
+    #[strum(to_string = "Focus")]
     Focus,
+    #[strum(to_string = "Long Break")]
     LongBreak,
+    #[strum(to_string = "Short Break")]
     ShortBreak,
-}
-
-impl std::fmt::Display for Mode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Focus => write!(f, "Focus"),
-            LongBreak => write!(f, "Long Break"),
-            ShortBreak => write!(f, "Short Break"),
-        }
-    }
 }
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
@@ -445,5 +453,36 @@ mod tests {
 
         let total_after_second_pause = pomo.total_time();
         assert!(total_after_second_pause >= total_after_pause + Duration::from_millis(40));
+    }
+
+    #[test]
+    fn test_before_long_interval() {
+        let mut pomo = Pomodoro {
+            long_interval: 3,
+            ..Default::default()
+        };
+        // focus
+
+        assert_eq!(pomo.before_long_break(), 3);
+
+        pomo.skip();
+        // short break
+        assert_eq!(pomo.before_long_break(), 2);
+
+        pomo.skip();
+        // focus
+        assert_eq!(pomo.before_long_break(), 2);
+
+        pomo.skip();
+        // short break
+        assert_eq!(pomo.before_long_break(), 1);
+
+        pomo.skip();
+        // focus
+        assert_eq!(pomo.before_long_break(), 1);
+
+        pomo.skip();
+        // long break
+        assert_eq!(pomo.before_long_break(), 3);
     }
 }

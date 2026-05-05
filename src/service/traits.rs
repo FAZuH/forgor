@@ -1,3 +1,4 @@
+use crate::model::Mode;
 use crate::service::SoundError;
 
 pub trait SoundService {
@@ -17,4 +18,8 @@ pub trait SoundService {
 
     /// Sleeps the thread until the currently playing sound ends.
     fn sleep_until_end(&mut self);
+}
+
+pub trait NotifyService {
+    fn send(&mut self, mode: Mode) -> Result<(), String>;
 }
