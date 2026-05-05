@@ -134,7 +134,7 @@ pub enum SettingsMsg<'a> {
     SetUnsavedChanges(bool),
     ToggleShowKeybinds,
     SelectForCopy,
-    CopyValue(&'a Config),
+    CopyValue(&'a PomodoroConfig),
 }
 
 #[derive(Debug, Clone, PartialEq)]

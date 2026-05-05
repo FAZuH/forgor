@@ -330,12 +330,11 @@ impl TuiSettingsView {
         self.show_keybinds
     }
 
-    fn copy_value(&mut self, conf: &Config) -> Vec<SettingsCmd> {
+    fn copy_value(&mut self, conf: &PomodoroConfig) -> Vec<SettingsCmd> {
         if let Some(from) = self.select_for_copy
-            && let Some(value) = Self::field_value(from, &conf.pomodoro)
+            && let Some(value) = Self::field_value(from, conf)
         {
-            self.cmd_from_edit(value, self.selected)
-                .unwrap_or_else(|e| vec![e])
+            self.cmd_from_edit(value).unwrap_or_else(|e| vec![e])
         } else {
             Vec::new()
         }
@@ -388,17 +387,13 @@ impl TuiSettingsView {
         });
     }
 
-    fn cmd_from_edit(
-        &mut self,
-        value: String,
-        selected: SettingsItem,
-    ) -> Result<Vec<SettingsCmd>, SettingsCmd> {
+    fn cmd_from_edit(&mut self, value: String) -> Result<Vec<SettingsCmd>, SettingsCmd> {
         use ConfigMsg as C;
         use SettingsItem as I;
 
         let mut cmds: Vec<SettingsCmd> = vec![];
 
-        let conf_msg = match selected {
+        let conf_msg = match self.selected {
             I::AutoStartOnLaunch => C::AutoStartOnLaunch,
             I::TimerFocus => C::TimerFocus(self.parse_dur(value)?),
             I::TimerShort => C::TimerShort(self.parse_dur(value)?),
@@ -491,8 +486,7 @@ impl TuiSettingsView {
         log::debug!("addr settings {:p}", self);
         log::debug!("value {}", value);
         self.update(SettingsMsg::CancelEditing);
-        self.cmd_from_edit(value, self.selected)
-            .unwrap_or_else(|e| vec![e])
+        self.cmd_from_edit(value).unwrap_or_else(|e| vec![e])
     }
 
     fn parse_path(&mut self, s: impl AsRef<str>, cmds: &mut Vec<SettingsCmd>) -> Option<PathBuf> {
