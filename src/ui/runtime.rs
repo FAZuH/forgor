@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-
 use crate::ui::core::AppCore;
 use crate::ui::core::Cmd;
 use crate::ui::core::Msg;
@@ -23,13 +21,15 @@ impl<E: EffectHandler> Runtime<E> {
     /// Dispatch a message and process all resulting effects
     /// synchronously until the message queue is drained.
     pub fn dispatch(&mut self, msg: Msg) {
-        let mut queue = VecDeque::from([msg]);
-        while let Some(msg) = queue.pop_front() {
-            for cmd in self.core.update(msg) {
-                for result_msg in self.effects.execute(cmd) {
-                    queue.push_back(result_msg);
-                }
-            }
+        let cmds = self.core.update(msg);
+        for cmd in cmds {
+            self.execute_effect(cmd);
+        }
+    }
+
+    pub fn execute_effect(&mut self, cmd: Cmd) {
+        for res in self.effects.execute(cmd) {
+            self.dispatch(res);
         }
     }
 
