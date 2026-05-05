@@ -28,6 +28,8 @@ pub struct Pomodoro {
     /// Remaining time frozen at pause, or session duration at start/reset.
     /// When running, actual remaining is `frozen_remaining - anchor.elapsed()`.
     frozen_remaining: Duration,
+
+    paused_at: Option<Instant>,
 }
 
 impl Pomodoro {
@@ -80,6 +82,7 @@ impl Pomodoro {
         if let Some(anchor) = self.anchor {
             self.accumulated += anchor.elapsed();
         }
+        self.paused_at = Some(Instant::now());
         self.anchor = None;
         Ok(())
     }
@@ -92,6 +95,7 @@ impl Pomodoro {
     pub fn resume(&mut self) -> Result<(), PomodoroError> {
         self.check_not_running()?;
         self.running = true;
+        self.paused_at = None;
         self.anchor = Some(Instant::now());
         Ok(())
     }
@@ -104,6 +108,10 @@ impl Pomodoro {
         } else {
             self.resume().unwrap()
         }
+    }
+
+    pub fn paused_at(&self) -> Option<Instant> {
+        self.paused_at
     }
 
     /// Skips to the next session.
@@ -211,6 +219,7 @@ impl Pomodoro {
         } else {
             None
         };
+        self.paused_at = None;
     }
 
     /// Returns [`PomodoroError::NotRunning`] if session is not running yet.
@@ -244,6 +253,7 @@ impl Default for Pomodoro {
             running: false,
             frozen_remaining: Duration::from_mins(25),
             anchor: None,
+            paused_at: None,
         }
     }
 }
