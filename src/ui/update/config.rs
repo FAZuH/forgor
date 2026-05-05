@@ -133,6 +133,8 @@ pub enum SettingsMsg<'a> {
     SetShowKeybinds(bool),
     SetUnsavedChanges(bool),
     ToggleShowKeybinds,
+    SelectForCopy,
+    CopyValue(&'a Config),
 }
 
 #[derive(Debug, Clone, PartialEq)]

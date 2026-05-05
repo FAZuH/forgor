@@ -30,6 +30,7 @@ use crate::ui::prelude::*;
 
 pub struct TuiSettingsView {
     selected: SettingsItem,
+    select_for_copy: Option<SettingsItem>,
     scroll_state: ScrollViewState,
     prompt: Option<SettingsPrompt>,
     has_unsaved_changes: bool,
@@ -93,6 +94,7 @@ impl TuiSettingsView {
     pub fn new() -> Self {
         Self {
             selected: SettingsItem::TimerFocus,
+            select_for_copy: None,
             scroll_state: ScrollViewState::default(),
             prompt: None,
             has_unsaved_changes: false,
@@ -293,6 +295,8 @@ impl<'a> Updateable<SettingsMsg<'a>, SettingsCmd> for TuiSettingsView {
             SetUnsavedChanges(v) => self.has_unsaved_changes = v,
             ToggleShowKeybinds => self.toggle_keybinds(),
             StartEdit(config) => self.start_editing_for_field(config),
+            CopyValue(config) => cmds.extend(self.copy_value(config)),
+            SelectForCopy => self.select_for_copy = Some(self.selected),
         }
 
         cmds
@@ -326,13 +330,24 @@ impl TuiSettingsView {
         self.show_keybinds
     }
 
-    fn start_editing_for_field(&mut self, config: &PomodoroConfig) {
+    fn copy_value(&mut self, conf: &Config) -> Vec<SettingsCmd> {
+        if let Some(from) = self.select_for_copy
+            && let Some(value) = Self::field_value(from, &conf.pomodoro)
+        {
+            self.cmd_from_edit(value, self.selected)
+                .unwrap_or_else(|e| vec![e])
+        } else {
+            Vec::new()
+        }
+    }
+
+    fn field_value(item: SettingsItem, config: &PomodoroConfig) -> Option<String> {
         let alarm = &config.alarm;
         let hook = &config.hook;
         let timer = &config.timer;
         use SettingsItem::*;
 
-        let mut value = match self.selected {
+        let mut value = match item {
             TimerFocus => format!("{}", timer.focus.as_secs() / 60),
             TimerShort => format!("{}", timer.short.as_secs() / 60),
             TimerLong => format!("{}", timer.long.as_secs() / 60),
@@ -346,12 +361,20 @@ impl TuiSettingsView {
             AlarmVolumeFocus => alarm.focus.volume(),
             AlarmVolumeShort => alarm.short.volume(),
             AlarmVolumeLong => alarm.long.volume(),
-            AutoStartOnLaunch | TimerAutoFocus | TimerAutoShort | TimerAutoLong => return,
+            AutoStartOnLaunch | TimerAutoFocus | TimerAutoShort | TimerAutoLong => return None,
         };
 
-        if self.selected.is_percentage() {
+        if item.is_percentage() {
             value = value[..value.len() - 1].to_string();
         }
+
+        Some(value)
+    }
+
+    fn start_editing_for_field(&mut self, config: &PomodoroConfig) {
+        let Some(value) = Self::field_value(self.selected, config) else {
+            return;
+        };
 
         let value_len = value.len();
         let mut text_state = TextState::new()
@@ -704,6 +727,12 @@ static KEYBINDS_ON: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
             sep.clone(),
             Span::styled("1/2/3", bright),
             Span::styled(": Jump", dim),
+            sep.clone(),
+            Span::styled("c/y", bright),
+            Span::styled(": Copy", dim),
+            sep.clone(),
+            Span::styled("v/p", bright),
+            Span::styled(": Paste", dim),
         ]),
         Line::from(vec![
             Span::styled("Space/Enter", bright),

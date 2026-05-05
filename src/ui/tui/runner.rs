@@ -234,6 +234,8 @@ impl TuiRunner {
                 K::Char('2') => dsp!(self, setting, SectionSelect(1)),
                 K::Char('3') => dsp!(self, setting, SectionSelect(2)),
                 K::Char('s') => dsp!(self, setting, SaveConfig),
+                K::Char('c') | K::Char('y') => dsp!(self, setting, SelectForCopy),
+                K::Char('v') | K::Char('p') => dsp!(self, setting, CopyValue(self.core.config())),
                 K::Esc => dsp!(self, router, RouterMsg::GoTo(Page::Timer)),
                 K::Char('q') => dsp!(self, router, RouterMsg::Quit),
                 K::Char('/') | K::Char('?') => dsp!(self, setting, ToggleShowKeybinds),
