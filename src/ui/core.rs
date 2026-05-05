@@ -112,8 +112,10 @@ impl AppCore {
             None => true,
         }
     }
+}
 
-    pub fn update(&mut self, msg: Msg) -> Vec<Cmd> {
+impl Updateable<Msg, Cmd> for AppCore {
+    fn update(&mut self, msg: Msg) -> Vec<Cmd> {
         let mut ret = Vec::new();
         match msg {
             Msg::Pomodoro(pm) => {
@@ -123,12 +125,8 @@ impl AppCore {
             Msg::Config(cm) => {
                 self.config.update(cm);
             }
-            Msg::ViewTimerCmd(cmd) => {
-                ret.extend(self.translate_timer_cmds(vec![cmd]));
-            }
-            Msg::ViewSettingsCmd(cmd) => {
-                ret.extend(self.translate_settings_cmds(vec![cmd]));
-            }
+            Msg::ViewTimerCmd(cmd) => ret.extend(self.translate_timer_cmd(cmd)),
+            Msg::ViewSettingsCmd(cmd) => ret.extend(self.translate_settings_cmds(cmd)),
             Msg::Tick => ret.extend(self.handle_tick()),
             Msg::Quit => self.router.navigate(Navigation::Quit),
             Msg::SessionCreated { id } => self.active_session_id = Some(id),
@@ -247,40 +245,15 @@ impl AppCore {
         ret
     }
 
-    fn translate_timer_cmds(&mut self, cmds: Vec<TimerCmd>) -> Vec<Cmd> {
+    fn translate_timer_cmd(&mut self, cmd: TimerCmd) -> Vec<Cmd> {
         let mut ret = vec![];
-        for cmd in cmds {
-            ret.push(Cmd::StopSound);
-            let pomo = match cmd {
-                TimerCmd::PromptTransitionAnsweredYes => {
-                    self.pomodoro.update(PomodoroMsg::NextSession)
-                }
-                TimerCmd::PromptTransitionAnsweredNo => self.pomodoro.update(PomodoroMsg::Pause),
-            };
-            ret.extend(self.translate_pomodoro_cmds(pomo));
-        }
+        ret.push(Cmd::StopSound);
+        let pomo = match cmd {
+            TimerCmd::PromptTransitionAnsweredYes => self.pomodoro.update(PomodoroMsg::NextSession),
+            TimerCmd::PromptTransitionAnsweredNo => self.pomodoro.update(PomodoroMsg::Pause),
+        };
+        ret.extend(self.translate_pomodoro_cmds(pomo));
         ret
-    }
-
-    fn translate_settings_cmds(&mut self, cmds: Vec<SettingsCmd>) -> Vec<Cmd> {
-        let mut output = vec![];
-        for cmd in cmds {
-            match cmd {
-                SettingsCmd::SaveEdit(config_msg) => {
-                    self.config.update(config_msg);
-                }
-                SettingsCmd::SaveConfig => {
-                    output.push(Cmd::SaveConfig(Box::new(self.config.clone())));
-                }
-                SettingsCmd::ShowToast { message, r#type } => {
-                    output.push(Cmd::ShowToast {
-                        message,
-                        kind: r#type,
-                    });
-                }
-            }
-        }
-        output
     }
 
     fn handle_session_end(&mut self) -> Vec<Cmd> {
@@ -312,6 +285,25 @@ impl AppCore {
         }
 
         ret
+    }
+
+    fn translate_settings_cmds(&mut self, cmd: SettingsCmd) -> Vec<Cmd> {
+        let mut output = vec![];
+        match cmd {
+            SettingsCmd::SaveEdit(config_msg) => {
+                self.config.update(config_msg);
+            }
+            SettingsCmd::SaveConfig => {
+                output.push(Cmd::SaveConfig(Box::new(self.config.clone())));
+            }
+            SettingsCmd::ShowToast { message, r#type } => {
+                output.push(Cmd::ShowToast {
+                    message,
+                    kind: r#type,
+                });
+            }
+        }
+        output
     }
 }
 

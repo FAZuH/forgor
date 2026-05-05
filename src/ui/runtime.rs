@@ -3,6 +3,7 @@ use std::collections::VecDeque;
 use crate::ui::core::AppCore;
 use crate::ui::core::Cmd;
 use crate::ui::core::Msg;
+use crate::ui::traits::Updateable as _;
 
 /// backend-specific effect execution.
 pub trait EffectHandler {
