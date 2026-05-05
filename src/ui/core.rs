@@ -1,21 +1,26 @@
 use crate::config::Alarm;
+use crate::config::Alarms;
 use crate::config::Config;
+use crate::config::Hooks;
+use crate::config::Timers;
 use crate::model::Mode;
 use crate::model::Pomodoro;
 use crate::repo::model::PomodoroState;
 use crate::ui::prelude::*;
+use crate::ui::router::RouterCmd;
+
+// type IPomodoro = Box<dyn Updateable<PomodoroMsg, PomodoroCmd>>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Msg {
     // Delegated to sub-models inside AppCore.
     Pomodoro(PomodoroMsg),
     Config(ConfigMsg),
+    Router(RouterMsg),
 
     // System messages.
     /// Emitted by the Runner every 1 second.
     Tick,
-    /// Emitted by the Runner when the user requests quit.
-    Quit,
 
     // Views
     ViewTimerCmd(TimerCmd),
@@ -57,7 +62,7 @@ pub enum Cmd {
         kind: ToastType,
     },
     // Persistence
-    SaveConfig(Box<Config>),
+    SaveConfig(Box<Config>), // Box, because Config is large.
     RunHook(String),
     // Views
 }
@@ -68,16 +73,17 @@ pub struct AppCore {
     router: Router,
 
     active_session_id: Option<i32>,
-    config_snapshot: Option<Config>,
+    config_snapshot: Config,
     is_prompting_transition: bool,
 }
 
 impl AppCore {
     pub fn new(pomodoro: Pomodoro, config: Config) -> Self {
         Self {
+            // pomodoro: Box::new(pomodoro),
             pomodoro,
             router: Router::new(Page::Timer),
-            config_snapshot: Some(config.clone()),
+            config_snapshot: config.clone(),
             config,
             active_session_id: None,
             is_prompting_transition: false,
@@ -107,10 +113,7 @@ impl AppCore {
     }
 
     pub fn is_config_dirty(&self) -> bool {
-        match &self.config_snapshot {
-            Some(snap) => self.config != *snap,
-            None => true,
-        }
+        self.config != self.config_snapshot
     }
 }
 
@@ -118,17 +121,24 @@ impl Updateable<Msg, Cmd> for AppCore {
     fn update(&mut self, msg: Msg) -> Vec<Cmd> {
         let mut ret = Vec::new();
         match msg {
-            Msg::Pomodoro(pm) => {
-                let cmds = self.pomodoro.update(pm);
-                ret.extend(self.translate_pomodoro_cmds(cmds));
+            Msg::Pomodoro(msg) => {
+                for cmd in self.pomodoro.update(msg) {
+                    ret.extend(self.translate_pomodoro_cmd(cmd));
+                }
             }
-            Msg::Config(cm) => {
-                self.config.update(cm);
+            Msg::Config(msg) => {
+                for cmd in self.config.update(msg) {
+                    ret.extend(self.translate_config_cmd(cmd))
+                }
+            }
+            Msg::Router(msg) => {
+                for cmd in self.router.update(msg) {
+                    ret.extend(self.translate_router_cmd(cmd));
+                }
             }
             Msg::ViewTimerCmd(cmd) => ret.extend(self.translate_timer_cmd(cmd)),
-            Msg::ViewSettingsCmd(cmd) => ret.extend(self.translate_settings_cmds(cmd)),
+            Msg::ViewSettingsCmd(cmd) => ret.extend(self.translate_settings_cmd(cmd)),
             Msg::Tick => ret.extend(self.handle_tick()),
-            Msg::Quit => self.router.navigate(Navigation::Quit),
             Msg::SessionCreated { id } => self.active_session_id = Some(id),
             Msg::SessionUpdated => {}
             Msg::SessionEnded => self.active_session_id = None,
@@ -149,8 +159,7 @@ impl AppCore {
             ret.push(Cmd::UpdateSession { id });
         }
 
-        let pomo_cmds = self.pomodoro.update(PomodoroMsg::Tick);
-        ret.extend(self.translate_pomodoro_cmds(pomo_cmds));
+        ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::Tick)));
 
         ret
     }
@@ -158,7 +167,7 @@ impl AppCore {
     fn handle_config_saved(&mut self, result: ConfigSaveResult) -> Vec<Cmd> {
         match result {
             ConfigSaveResult::Ok => {
-                self.config_snapshot = Some(self.config.clone());
+                self.config_snapshot = self.config.clone();
                 vec![Cmd::ShowToast {
                     message: "Settings saved!".into(),
                     kind: ToastType::Success,
@@ -171,115 +180,32 @@ impl AppCore {
         }
     }
 
-    fn should_auto_next(&self) -> bool {
-        let timer = &self.config.pomodoro.timer;
-        match self.pomodoro.mode() {
-            Mode::Focus => timer.auto_focus,
-            Mode::LongBreak => timer.auto_long,
-            Mode::ShortBreak => timer.auto_short,
-        }
-    }
-
-    fn alarm_for(&self, mode: Mode) -> &Alarm {
-        let alarms = &self.config.pomodoro.alarm;
-        match mode {
-            Mode::Focus => &alarms.focus,
-            Mode::LongBreak => &alarms.long,
-            Mode::ShortBreak => &alarms.short,
-        }
-    }
-
-    fn hook_for(&self, mode: Mode) -> &str {
-        let hooks = &self.config.pomodoro.hook;
-        match mode {
-            Mode::Focus => &hooks.focus,
-            Mode::LongBreak => &hooks.long,
-            Mode::ShortBreak => &hooks.short,
-        }
-    }
-}
-
-impl AppCore {
-    fn translate_pomodoro_cmds(&mut self, cmds: Vec<PomodoroCmd>) -> Vec<Cmd> {
-        let mut ret = Vec::new();
-        for cmd in cmds {
-            match cmd {
-                PomodoroCmd::Started => {
-                    ret.push(Cmd::NewSession {
-                        task_id: None,
-                        state: self.pomodoro.mode().into(),
-                    });
-                }
-                PomodoroCmd::StartedPaused => {}
-                PomodoroCmd::SessionEnd => {
-                    ret.extend(self.handle_session_end());
-                }
-                PomodoroCmd::NextSession => {
-                    ret.push(Cmd::NewSession {
-                        task_id: None,
-                        state: self.pomodoro.mode().into(),
-                    });
-                }
-                PomodoroCmd::SessionPaused => {
-                    if let Some(id) = self.active_session_id.take() {
-                        ret.push(Cmd::EndSession { id });
-                    }
-                }
-                PomodoroCmd::SessionResumed => {
-                    ret.push(Cmd::NewSession {
-                        task_id: None,
-                        state: self.pomodoro.mode().into(),
-                    });
-                }
-                PomodoroCmd::SessionSkipped => {
-                    if let Some(id) = self.active_session_id.take() {
-                        ret.push(Cmd::EndSession { id });
-                    }
-                    ret.push(Cmd::NewSession {
-                        task_id: None,
-                        state: self.pomodoro.mode().into(),
-                    });
-                }
-            }
-        }
-        ret
-    }
-
-    fn translate_timer_cmd(&mut self, cmd: TimerCmd) -> Vec<Cmd> {
-        let mut ret = vec![];
-        ret.push(Cmd::StopSound);
-        let pomo = match cmd {
-            TimerCmd::PromptTransitionAnsweredYes => self.pomodoro.update(PomodoroMsg::NextSession),
-            TimerCmd::PromptTransitionAnsweredNo => self.pomodoro.update(PomodoroMsg::Pause),
-        };
-        ret.extend(self.translate_pomodoro_cmds(pomo));
-        ret
-    }
-
-    fn handle_session_end(&mut self) -> Vec<Cmd> {
-        let auto_next = self.should_auto_next();
-        let current_mode = self.pomodoro.mode();
-        let next_mode = self.pomodoro.next_mode();
+    fn handle_session_end(&mut self, curr_mode: Mode, next_mode: Mode) -> Vec<Cmd> {
         let mut ret = Vec::new();
 
-        // End the active session (only fires once — id is taken).
+        // End the active session (.take() so only fires once).
         if let Some(id) = self.active_session_id.take() {
             ret.push(Cmd::EndSession { id });
         }
 
         // Fire effects: sound, notification, hook.
         // Skipped if already prompting (effects already fired on first SessionEnd).
+        let config = &self.config_snapshot;
+        let auto_next = self.should_auto_next(&curr_mode, &config.pomodoro.timer);
         let should_fire = auto_next || !self.is_prompting_transition;
+
         if should_fire {
-            ret.push(Cmd::PlaySound(self.alarm_for(next_mode).clone()));
+            let alarm = self.alarm_for(&next_mode, &config.pomodoro.alarm).clone();
+            let hook = self.hook_for(&curr_mode, &config.pomodoro.hook).to_string();
+
             ret.push(Cmd::SendNotification(next_mode));
-            ret.push(Cmd::RunHook(self.hook_for(current_mode).to_string()));
+            ret.push(Cmd::PlaySound(alarm));
+            ret.push(Cmd::RunHook(hook));
         }
 
         if auto_next {
             // Advance to the next mode and start a fresh session.
-            let next = self.pomodoro.update(PomodoroMsg::NextSession);
-            ret.extend(self.translate_pomodoro_cmds(next));
+            ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::NextSession)));
         } else {
             self.is_prompting_transition = true;
         }
@@ -287,23 +213,126 @@ impl AppCore {
         ret
     }
 
-    fn translate_settings_cmds(&mut self, cmd: SettingsCmd) -> Vec<Cmd> {
-        let mut output = vec![];
+    fn should_auto_next(&self, mode: &Mode, timer: &Timers) -> bool {
+        match mode {
+            Mode::Focus => timer.auto_focus,
+            Mode::LongBreak => timer.auto_long,
+            Mode::ShortBreak => timer.auto_short,
+        }
+    }
+
+    fn alarm_for<'l>(&self, mode: &Mode, alarm: &'l Alarms) -> &'l Alarm {
+        match mode {
+            Mode::Focus => &alarm.focus,
+            Mode::LongBreak => &alarm.long,
+            Mode::ShortBreak => &alarm.short,
+        }
+    }
+
+    fn hook_for<'l>(&self, mode: &Mode, hook: &'l Hooks) -> &'l str {
+        match mode {
+            Mode::Focus => &hook.focus,
+            Mode::LongBreak => &hook.long,
+            Mode::ShortBreak => &hook.short,
+        }
+    }
+}
+
+impl AppCore {
+    fn translate_pomodoro_cmd(&mut self, cmd: PomodoroCmd) -> Vec<Cmd> {
+        let mut ret = Vec::new();
         match cmd {
-            SettingsCmd::SaveEdit(config_msg) => {
-                self.config.update(config_msg);
+            PomodoroCmd::Started(mode) => {
+                ret.push(Cmd::NewSession {
+                    task_id: None,
+                    state: mode.into(),
+                });
+            }
+            PomodoroCmd::StartedPaused => {}
+            PomodoroCmd::SessionEnd {
+                curr_mode,
+                next_mode,
+            } => {
+                ret.extend(self.handle_session_end(curr_mode, next_mode));
+            }
+            PomodoroCmd::NextSession(mode) => {
+                ret.push(Cmd::NewSession {
+                    task_id: None,
+                    state: mode.into(),
+                });
+            }
+            PomodoroCmd::SessionPaused => {
+                if let Some(id) = self.active_session_id.take() {
+                    ret.push(Cmd::EndSession { id });
+                }
+            }
+            PomodoroCmd::SessionResumed(mode) => {
+                ret.push(Cmd::NewSession {
+                    task_id: None,
+                    state: mode.into(),
+                });
+            }
+            PomodoroCmd::SessionSkipped(mode) => {
+                if let Some(id) = self.active_session_id.take() {
+                    ret.push(Cmd::EndSession { id });
+                }
+                ret.push(Cmd::NewSession {
+                    task_id: None,
+                    state: mode.into(),
+                });
+            }
+        }
+        ret
+    }
+
+    fn translate_config_cmd(&mut self, cmd: ConfigCmd) -> Vec<Cmd> {
+        let ret = vec![];
+        match cmd {
+            ConfigCmd::None => {}
+        }
+        ret
+    }
+
+    fn translate_router_cmd(&mut self, cmd: RouterCmd) -> Vec<Cmd> {
+        let ret = vec![];
+        match cmd {
+            RouterCmd::Quit => {}
+        }
+        ret
+    }
+
+    fn translate_timer_cmd(&mut self, cmd: TimerCmd) -> Vec<Cmd> {
+        let mut ret = vec![Cmd::StopSound];
+
+        match cmd {
+            TimerCmd::PromptTransitionAnsweredYes => {
+                ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::NextSession)))
+            }
+            TimerCmd::PromptTransitionAnsweredNo => {
+                ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::Pause)))
+            }
+        };
+
+        ret
+    }
+
+    fn translate_settings_cmd(&mut self, cmd: SettingsCmd) -> Vec<Cmd> {
+        let mut ret = vec![];
+        match cmd {
+            SettingsCmd::SaveEdit(msg) => {
+                ret.extend(self.update(Msg::Config(msg)));
             }
             SettingsCmd::SaveConfig => {
-                output.push(Cmd::SaveConfig(Box::new(self.config.clone())));
+                ret.push(Cmd::SaveConfig(Box::new(self.config.clone())));
             }
             SettingsCmd::ShowToast { message, r#type } => {
-                output.push(Cmd::ShowToast {
+                ret.push(Cmd::ShowToast {
                     message,
                     kind: r#type,
                 });
             }
         }
-        output
+        ret
     }
 }
 

@@ -1,6 +1,6 @@
-pub use super::router::Navigation;
 pub use super::router::Page;
 pub use super::router::Router;
+pub use super::router::RouterMsg;
 pub use super::traits::*;
 pub use super::update::ConfigCmd;
 pub use super::update::ConfigMsg;

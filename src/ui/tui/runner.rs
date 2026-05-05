@@ -37,6 +37,10 @@ impl Runner for TuiRunner {
 }
 
 macro_rules! dsp {
+    ($self:ident, runtime, $page:expr) => {{
+        $self.runtime.update($page);
+        $self.redraw = true;
+    }};
     ($self:ident, pomo, $msg:expr) => {{
         log::trace!("msg config: {:?}", $msg);
         $self.runtime.dispatch(Msg::Pomodoro($msg));
@@ -45,6 +49,10 @@ macro_rules! dsp {
     ($self:ident, config, $msg:expr) => {{
         log::trace!("msg config: {:?}", $msg);
         $self.runtime.dispatch(Msg::Config($msg));
+        $self.redraw = true;
+    }};
+    ($self:ident, router, $page:expr) => {{
+        $self.runtime.dispatch(Msg::Router($page));
         $self.redraw = true;
     }};
     ($self:ident, timer, $msg:expr) => {{
@@ -60,10 +68,6 @@ macro_rules! dsp {
         for cmd in cmds {
             $self.runtime.dispatch(Msg::ViewSettingsCmd(cmd));
         }
-        $self.redraw = true;
-    }};
-    ($self:ident, runtime, $page:expr) => {{
-        $self.runtime.core_mut().router_mut().navigate($page);
         $self.redraw = true;
     }};
 }
@@ -164,7 +168,7 @@ impl TuiRunner {
                 match self.runtime.core().router().active_page() {
                     Some(Page::Settings) => self.handle_settings(event),
                     Some(Page::Timer) => self.handle_timer(event),
-                    None => self.runtime.dispatch(Msg::Quit),
+                    None => dsp!(self, router, RouterMsg::Quit),
                 }
             }
         }
@@ -195,8 +199,8 @@ impl TuiRunner {
                 K::Char(' ') => dsp!(self, pomo, TogglePause),
                 K::Enter => dsp!(self, pomo, SkipSession),
                 K::Backspace => dsp!(self, pomo, ResetSession),
-                K::Char('q') => self.runtime.dispatch(Msg::Quit),
-                K::Char('s') => dsp!(self, runtime, Page::Settings),
+                K::Char('q') => dsp!(self, router, RouterMsg::Quit),
+                K::Char('s') => dsp!(self, router, RouterMsg::GoTo(Page::Settings)),
                 K::Char('/') | K::Char('?') => dsp!(self, timer, TimerMsg::ToggleShowKeybinds),
                 _ => {}
             }
@@ -241,8 +245,8 @@ impl TuiRunner {
                 K::Char('2') => dsp!(self, setting, SectionSelect(1)),
                 K::Char('3') => dsp!(self, setting, SectionSelect(2)),
                 K::Char('s') => dsp!(self, setting, SaveConfig),
-                K::Esc => dsp!(self, runtime, Page::Timer),
-                K::Char('q') => self.runtime.dispatch(Msg::Quit),
+                K::Esc => dsp!(self, router, RouterMsg::GoTo(Page::Timer)),
+                K::Char('q') => dsp!(self, router, RouterMsg::Quit),
                 K::Char('/') | K::Char('?') => dsp!(self, setting, ToggleShowKeybinds),
                 _ => {}
             },

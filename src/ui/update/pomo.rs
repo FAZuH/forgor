@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use crate::model::Mode;
 use crate::model::Pomodoro;
 use crate::ui::prelude::*;
 
@@ -20,15 +21,15 @@ pub enum PomodoroMsg {
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
 pub enum PomodoroCmd {
-    Started,
+    Started(Mode),
     StartedPaused,
 
-    SessionEnd,
-    NextSession,
+    SessionEnd { curr_mode: Mode, next_mode: Mode },
+    NextSession(Mode),
 
     SessionPaused,
-    SessionResumed,
-    SessionSkipped,
+    SessionResumed(Mode),
+    SessionSkipped(Mode),
 }
 
 impl Updateable<PomodoroMsg, PomodoroCmd> for Pomodoro {
@@ -38,7 +39,7 @@ impl Updateable<PomodoroMsg, PomodoroCmd> for Pomodoro {
         match msg {
             Start => {
                 let _ = self.start();
-                cmds.push(PomodoroCmd::Started)
+                cmds.push(PomodoroCmd::Started(self.mode()))
             }
             StartPaused => {
                 let _ = self.start();
@@ -53,7 +54,7 @@ impl Updateable<PomodoroMsg, PomodoroCmd> for Pomodoro {
             }
             Resume => {
                 let _ = self.resume();
-                cmds.push(PomodoroCmd::SessionResumed)
+                cmds.push(PomodoroCmd::SessionResumed(self.mode()))
             }
             TogglePause => {
                 if self.is_running() {
@@ -64,16 +65,19 @@ impl Updateable<PomodoroMsg, PomodoroCmd> for Pomodoro {
             }
             NextSession => {
                 self.skip();
-                cmds.push(PomodoroCmd::NextSession)
+                cmds.push(PomodoroCmd::NextSession(self.mode()))
             }
             SkipSession => {
                 self.skip();
-                cmds.push(PomodoroCmd::SessionSkipped)
+                cmds.push(PomodoroCmd::SessionSkipped(self.mode()))
             }
             ResetSession => self.reset(),
             Tick => {
                 if self.remaining_time().is_zero() {
-                    cmds.push(PomodoroCmd::SessionEnd)
+                    cmds.push(PomodoroCmd::SessionEnd {
+                        curr_mode: self.mode(),
+                        next_mode: self.next_mode(),
+                    })
                 }
             }
         }
