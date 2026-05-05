@@ -27,6 +27,7 @@ pub struct TuiRunner {
 
     timer: TuiTimerView,
     settings: TuiSettingsView,
+    show_duplicate_warning: bool,
 }
 
 impl Runner for TuiRunner {
@@ -72,8 +73,9 @@ macro_rules! dsp {
 }
 
 impl TuiRunner {
-    pub fn new(core: AppCore<TuiEffectHandler>) -> Result<Self, UiError> {
+    pub fn new(core: AppCore<TuiEffectHandler>, is_duplicate: bool) -> Result<Self, UiError> {
         let terminal = Tui::new()?;
+
         Ok(Self {
             core,
             terminal,
@@ -81,24 +83,29 @@ impl TuiRunner {
             settings: TuiSettingsView::new(),
             tick: TickTimer::default(),
             redraw: true,
+            show_duplicate_warning: is_duplicate,
         })
     }
 
     fn run_loop(&mut self) -> Result<(), TuiError> {
-        // Initial dispatch for auto-start.
-        let auto_start = self.core.config().pomodoro.timer.auto_start_on_launch;
-        if auto_start {
-            dsp!(self, pomo, PomodoroMsg::Start);
-        } else {
-            dsp!(self, pomo, PomodoroMsg::StartPaused);
-        }
-
+        self.initial();
         while !self.core.router().is_quit() {
             self.render_terminal()?;
             self.tick();
             self.handle_inputs()?;
         }
         Ok(())
+    }
+
+    fn initial(&mut self) {
+        // Initial dispatch for auto-start.
+        let auto_start = self.core.config().pomodoro.timer.auto_start_on_launch;
+
+        if auto_start {
+            dsp!(self, pomo, PomodoroMsg::Start);
+        } else {
+            dsp!(self, pomo, PomodoroMsg::StartPaused);
+        }
     }
 
     fn render_terminal(&mut self) -> Result<(), TuiError> {
@@ -112,16 +119,22 @@ impl TuiRunner {
                     None => {}
                 }
 
+                let area = f.area();
+
                 let toast = self.core.effects_mut().toast_mut();
-                toast.set_area(f.area());
-                f.render_widget(&**toast, f.area());
+                toast.set_area(area);
+                f.render_widget(&**toast, area);
+
+                if self.show_duplicate_warning {
+                    f.render_widget(DuplicateWarning::new(), area);
+                }
             })?;
         }
         Ok(())
     }
 
     fn tick(&mut self) {
-        if self.tick.new_tick() {
+        if self.tick.new_tick() && !self.show_duplicate_warning {
             self.core.effects_mut().toast_mut().tick();
             self.core.dispatch(Msg::Tick);
             self.redraw();
@@ -153,7 +166,14 @@ impl TuiRunner {
                         continue;
                     }
                 }
+
                 self.common_handler(&event);
+
+                if self.show_duplicate_warning {
+                    self.handle_duplicate_warning(&event);
+                    continue;
+                }
+
                 match self.core.router().active_page() {
                     Some(Page::Settings) => self.handle_settings(event),
                     Some(Page::Timer) => self.handle_timer(event),
@@ -171,6 +191,23 @@ impl TuiRunner {
             }
             Event::Resize(..) => self.redraw(),
             _ => {}
+        }
+    }
+
+    fn handle_duplicate_warning(&mut self, event: &Event) {
+        if let Event::Key(key) = event {
+            use KeyCode as K;
+            match key.code {
+                K::Enter | K::Char('y') => {
+                    self.show_duplicate_warning = false;
+                    self.core.dispatch(Msg::DuplicateWarningDismiss);
+                    self.redraw();
+                }
+                K::Char('q') | K::Esc | K::Char('n') => {
+                    self.core.dispatch(Msg::DuplicateWarningQuit);
+                }
+                _ => {}
+            }
         }
     }
 

@@ -34,6 +34,10 @@ pub enum Msg {
     SessionsClosed,
     ConfigSaved(ConfigSaveResult),
     NotificationSent(Result<(), String>),
+
+    // Duplicate instance warning
+    DuplicateWarningDismiss,
+    DuplicateWarningQuit,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -168,6 +172,19 @@ impl<E: EffectHandler> Updateable<Msg, Cmd> for AppCore<E> {
             Msg::SessionsClosed => {}
             Msg::ConfigSaved(result) => ret.extend(self.handle_config_saved(result)),
             Msg::NotificationSent(_) => {}
+            Msg::DuplicateWarningDismiss => {
+                ret.push(Cmd::CloseAllSessions);
+                ret.extend(self.update(Msg::Router(RouterMsg::GoTo(Page::Timer))));
+                let auto_start = self.config.pomodoro.timer.auto_start_on_launch;
+                if auto_start {
+                    ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::Start)));
+                } else {
+                    ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::StartPaused)));
+                }
+            }
+            Msg::DuplicateWarningQuit => {
+                ret.extend(self.update(Msg::Router(RouterMsg::Quit)));
+            }
         }
         ret
     }
