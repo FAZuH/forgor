@@ -3,10 +3,7 @@ use crate::repo::Repos;
 use crate::service::NotifyService;
 use crate::service::SoundService;
 use crate::service::cmd_runner::run_hook_command;
-use crate::ui::core::Cmd;
-use crate::ui::core::ConfigSaveResult;
-use crate::ui::core::Msg;
-use crate::ui::runtime::EffectHandler;
+use crate::ui::prelude::*;
 use crate::ui::tui::toast::ToastHandler;
 
 pub struct TuiEffectHandler {

@@ -59,13 +59,10 @@ function extractScope(body, fallback) {
     .filter((l) => l !== "");
   if (lines.length === 0) return fallback;
 
-  const first = lines[0];
-
-  const standaloneMatch = first.match(/^\[([^\]]+)\]$/);
-  if (standaloneMatch) return standaloneMatch[1];
-
-  const inlineMatch = first.match(/^\[([^\]]+)\]\s+(.*)$/);
-  if (inlineMatch) return inlineMatch[1];
+  const scopeLine = lines.find((l) => /^scope:\s*/i.test(l));
+  if (scopeLine) {
+    return scopeLine.replace(/^scope:\s*/i, "").trim();
+  }
 
   return fallback;
 }
@@ -80,18 +77,12 @@ function extractChangelogText(body) {
     .filter((l) => l !== "");
   if (lines.length === 0) return null;
 
-  const first = lines[0];
-
-  const inlineMatch = first.match(/^\[[^\]]+\]\s+(.*)$/);
-  if (inlineMatch) return inlineMatch[1];
-
-  const hasStandaloneScope = /^\[[^\]]+\]$/.test(first);
-  if (hasStandaloneScope) {
-    const rest = lines.slice(1);
-    return rest.length > 0 ? rest.join(" ") : null;
+  const changelogLine = lines.find((l) => /^changelog:\s*/i.test(l));
+  if (changelogLine) {
+    return changelogLine.replace(/^changelog:\s*/i, "").trim();
   }
 
-  return lines.join(" ");
+  return null;
 }
 
 async function getOptions() {

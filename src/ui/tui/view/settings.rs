@@ -30,6 +30,7 @@ use crate::ui::prelude::*;
 
 pub struct TuiSettingsView {
     selected: SettingsItem,
+    select_for_copy: Option<SettingsItem>,
     scroll_state: ScrollViewState,
     prompt: Option<SettingsPrompt>,
     has_unsaved_changes: bool,
@@ -93,6 +94,7 @@ impl TuiSettingsView {
     pub fn new() -> Self {
         Self {
             selected: SettingsItem::TimerFocus,
+            select_for_copy: None,
             scroll_state: ScrollViewState::default(),
             prompt: None,
             has_unsaved_changes: false,
@@ -293,6 +295,8 @@ impl<'a> Updateable<SettingsMsg<'a>, SettingsCmd> for TuiSettingsView {
             SetUnsavedChanges(v) => self.has_unsaved_changes = v,
             ToggleShowKeybinds => self.toggle_keybinds(),
             StartEdit(config) => self.start_editing_for_field(config),
+            CopyValue(config) => cmds.extend(self.copy_value(config)),
+            SelectForCopy => self.select_for_copy = Some(self.selected),
         }
 
         cmds
@@ -326,13 +330,23 @@ impl TuiSettingsView {
         self.show_keybinds
     }
 
-    fn start_editing_for_field(&mut self, config: &PomodoroConfig) {
+    fn copy_value(&mut self, conf: &PomodoroConfig) -> Vec<SettingsCmd> {
+        if let Some(from) = self.select_for_copy
+            && let Some(value) = Self::field_value(from, conf)
+        {
+            self.cmd_from_edit(value).unwrap_or_else(|e| vec![e])
+        } else {
+            Vec::new()
+        }
+    }
+
+    fn field_value(item: SettingsItem, config: &PomodoroConfig) -> Option<String> {
         let alarm = &config.alarm;
         let hook = &config.hook;
         let timer = &config.timer;
         use SettingsItem::*;
 
-        let mut value = match self.selected {
+        let mut value = match item {
             TimerFocus => format!("{}", timer.focus.as_secs() / 60),
             TimerShort => format!("{}", timer.short.as_secs() / 60),
             TimerLong => format!("{}", timer.long.as_secs() / 60),
@@ -346,12 +360,20 @@ impl TuiSettingsView {
             AlarmVolumeFocus => alarm.focus.volume(),
             AlarmVolumeShort => alarm.short.volume(),
             AlarmVolumeLong => alarm.long.volume(),
-            AutoStartOnLaunch | TimerAutoFocus | TimerAutoShort | TimerAutoLong => return,
+            AutoStartOnLaunch | TimerAutoFocus | TimerAutoShort | TimerAutoLong => return None,
         };
 
-        if self.selected.is_percentage() {
+        if item.is_percentage() {
             value = value[..value.len() - 1].to_string();
         }
+
+        Some(value)
+    }
+
+    fn start_editing_for_field(&mut self, config: &PomodoroConfig) {
+        let Some(value) = Self::field_value(self.selected, config) else {
+            return;
+        };
 
         let value_len = value.len();
         let mut text_state = TextState::new()
@@ -365,17 +387,13 @@ impl TuiSettingsView {
         });
     }
 
-    fn cmd_from_edit(
-        &mut self,
-        value: String,
-        selected: SettingsItem,
-    ) -> Result<Vec<SettingsCmd>, SettingsCmd> {
+    fn cmd_from_edit(&mut self, value: String) -> Result<Vec<SettingsCmd>, SettingsCmd> {
         use ConfigMsg as C;
         use SettingsItem as I;
 
         let mut cmds: Vec<SettingsCmd> = vec![];
 
-        let conf_msg = match selected {
+        let conf_msg = match self.selected {
             I::AutoStartOnLaunch => C::AutoStartOnLaunch,
             I::TimerFocus => C::TimerFocus(self.parse_dur(value)?),
             I::TimerShort => C::TimerShort(self.parse_dur(value)?),
@@ -468,8 +486,7 @@ impl TuiSettingsView {
         log::debug!("addr settings {:p}", self);
         log::debug!("value {}", value);
         self.update(SettingsMsg::CancelEditing);
-        self.cmd_from_edit(value, self.selected)
-            .unwrap_or_else(|e| vec![e])
+        self.cmd_from_edit(value).unwrap_or_else(|e| vec![e])
     }
 
     fn parse_path(&mut self, s: impl AsRef<str>, cmds: &mut Vec<SettingsCmd>) -> Option<PathBuf> {
@@ -487,12 +504,12 @@ impl TuiSettingsView {
         Some(path)
     }
 
-    fn parse_dur(&mut self, s: impl AsRef<str>) -> Result<Duration, SettingsCmd> {
+    fn parse_dur(&self, s: impl AsRef<str>) -> Result<Duration, SettingsCmd> {
         self.try_parse(s, |s| s.parse::<u64>(), "integer")
             .map(|val| Duration::from_secs(val * 60))
     }
 
-    fn parse_vol(&mut self, s: impl AsRef<str>) -> Result<Percentage, SettingsCmd> {
+    fn parse_vol(&self, s: impl AsRef<str>) -> Result<Percentage, SettingsCmd> {
         let s = s.as_ref();
         if s.is_empty() {
             Ok(Percentage::default())
@@ -502,7 +519,7 @@ impl TuiSettingsView {
     }
 
     fn try_parse<T, E: std::fmt::Debug>(
-        &mut self,
+        &self,
         s: impl AsRef<str>,
         f: impl for<'a> FnOnce(&'a str) -> Result<T, E>,
         label: &str,
@@ -696,6 +713,19 @@ static KEYBINDS_ON: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
     let sep = Span::styled(" • ", dim);
     Paragraph::new(vec![
         Line::from(vec![
+            Span::styled("Space/Enter", bright),
+            Span::styled(": Edit", dim),
+            sep.clone(),
+            Span::styled("s", bright),
+            Span::styled(": Save", dim),
+            sep.clone(),
+            Span::styled("c/y", bright),
+            Span::styled(": Copy", dim),
+            sep.clone(),
+            Span::styled("v/p", bright),
+            Span::styled(": Paste", dim),
+        ]),
+        Line::from(vec![
             Span::styled("↑/↓/j/k", bright),
             Span::styled(": Navigate", dim),
             sep.clone(),
@@ -704,22 +734,15 @@ static KEYBINDS_ON: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
             sep.clone(),
             Span::styled("1/2/3", bright),
             Span::styled(": Jump", dim),
-        ]),
-        Line::from(vec![
-            Span::styled("Space/Enter", bright),
-            Span::styled(": Edit", dim),
-            sep.clone(),
-            Span::styled("m", bright),
-            Span::styled(": Stop alarm", dim),
-            sep.clone(),
-            Span::styled("s", bright),
-            Span::styled(": Save", dim),
             sep.clone(),
             Span::styled("Esc", bright),
             Span::styled(": Back", dim),
             sep.clone(),
             Span::styled("q", bright),
             Span::styled(": Quit", dim),
+            sep.clone(),
+            Span::styled("m", bright),
+            Span::styled(": Stop alarm", dim),
             sep.clone(),
             Span::styled("?", bright),
             Span::styled(": Disable Help", dim),

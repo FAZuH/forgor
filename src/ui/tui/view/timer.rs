@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::LazyLock;
 use std::time::Duration;
+use std::time::Instant;
 
 use ratatui::layout::Flex;
 use ratatui::prelude::*;
@@ -40,17 +41,12 @@ impl TuiTimerView {
 
         let rows = LAYOUT.split(area);
 
-        self.state(rows[1], buf, mode, paused);
-        self.timer(rows[3], buf, &remaining, mode);
-        self.progress_bar(rows[4], buf, progress, mode);
-        self.stats(
-            rows[6],
-            buf,
-            state.long_interval(),
-            state.total_sessions(),
-            state.focus_sessions(),
-        );
-        self.keybinds(rows[8], buf, show_binds);
+        self.paused_time(rows[1], buf, state.paused_at());
+        self.state(rows[3], buf, mode, paused);
+        self.timer(rows[5], buf, &remaining, mode);
+        self.progress_bar(rows[6], buf, progress, mode);
+        self.stats(rows[8], buf, state);
+        self.keybinds(rows[10], buf, show_binds);
         self.prompt(area, buf, state);
     }
 }
@@ -93,6 +89,26 @@ impl TuiTimerView {
                 area,
                 buf,
             );
+        }
+    }
+
+    fn paused_time(&self, area: Rect, buf: &mut Buffer, paused_time: Option<Instant>) {
+        if let Some(time) = paused_time {
+            let dim = Style::default().dim();
+            let total_secs = Instant::now().duration_since(time).as_secs();
+            let minutes = total_secs / 60;
+            let seconds = total_secs % 60;
+            let formatted_time = if minutes == 0 {
+                format!("{seconds}s")
+            } else {
+                format!("{minutes}m {seconds}s")
+            };
+
+            let line = Line::styled(format!("Paused {formatted_time} ago"), dim);
+
+            Paragraph::new(line)
+                .alignment(HorizontalAlignment::Center)
+                .render(area, buf);
         }
     }
 
@@ -150,14 +166,11 @@ impl TuiTimerView {
             .render(area, buf);
     }
 
-    fn stats(
-        &self,
-        area: Rect,
-        buf: &mut Buffer,
-        long_interval: u32,
-        total_sessions: u32,
-        focus_sessions: u32,
-    ) {
+    fn stats(&self, area: Rect, buf: &mut Buffer, state: &Pomodoro) {
+        let long_interval = state.long_interval();
+        let total_sessions = state.total_sessions();
+        let focus_sessions = state.focus_sessions();
+        let before_long_break = state.before_long_break();
         let dim = Style::default().dim();
         let bright = Style::default();
         let line = Line::from(vec![
@@ -167,6 +180,7 @@ impl TuiTimerView {
             Span::styled(total_sessions.to_string(), bright),
             Span::styled("  │  Long break every: ", dim),
             Span::styled(long_interval.to_string(), bright),
+            Span::styled(format!(" (in {before_long_break} focus sessions)"), dim),
         ]);
 
         Paragraph::new(line)
@@ -201,6 +215,8 @@ impl From<Mode> for Color {
 static LAYOUT: LazyLock<Layout> = LazyLock::new(|| {
     Layout::vertical([
         Constraint::Fill(1),
+        Constraint::Length(1), // paused_time
+        Constraint::Length(1),
         Constraint::Length(3), // state
         Constraint::Length(2),
         Constraint::Length(9), // timer

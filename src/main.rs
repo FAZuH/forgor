@@ -14,7 +14,6 @@ use tomo::service::NotifyService;
 use tomo::service::SoundService;
 use tomo::service::alarm::AlarmService;
 use tomo::ui::Runner;
-use tomo::ui::runtime::Runtime;
 
 type Repo = Box<dyn Repos>;
 type Sound = Box<dyn SoundService<SoundType = Alarm>>;
@@ -23,7 +22,14 @@ type View = Box<dyn Runner>;
 
 fn main() -> Result<(), AppError> {
     let cli = Cli::parse();
-    let conf = Config::load()?;
+
+    let mut conf = if let Some(ref conf) = cli.config_path {
+        Config::new(conf.clone())
+    } else {
+        Config::default()
+    };
+    conf.load()?;
+
     setup_logging(&conf.logs_path)?;
     color_eyre::install().unwrap();
     info!("initializing {} v{}", tomo::APP_NAME, tomo::APP_VERSION);
@@ -46,11 +52,10 @@ fn view(conf: Config, repo: Repo, sound: Sound, notify: Notify, pomo: Pomodoro) 
     use tomo::ui::tui::TuiEffectHandler;
     use tomo::ui::tui::TuiRunner;
 
-    let effect_handler = TuiEffectHandler::new(sound, notify, repo);
-    let core = AppCore::new(pomo, conf);
-    let runtime = Runtime::new(core, effect_handler);
+    let effect = TuiEffectHandler::new(sound, notify, repo);
+    let core = AppCore::new(pomo, conf, effect);
 
-    Box::new(TuiRunner::new(runtime).unwrap())
+    Box::new(TuiRunner::new(core).unwrap())
 }
 
 fn repo(path: &Path) -> Repo {

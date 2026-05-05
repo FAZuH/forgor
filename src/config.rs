@@ -15,48 +15,65 @@ pub struct Config {
     pub pomodoro: PomodoroConfig,
     pub logs_path: PathBuf,
     pub db_path: PathBuf,
+    #[serde(skip)]
+    pub conf_path: PathBuf,
+    #[serde(skip)]
+    pub conf_dir: PathBuf,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        let conf_dir = utils::conf_dir();
-        let logs_path = conf_dir.join("logs");
-        let db_path = conf_dir.join("data.db");
-        Self {
-            pomodoro: Default::default(),
-            logs_path,
-            db_path,
-        }
+        Self::new(utils::conf_dir())
     }
 }
 
 impl Config {
-    pub fn load() -> Result<Self, ConfigError> {
-        let conf_dir = utils::conf_dir();
-        debug!("Config directory: {:?}", conf_dir);
-        if !conf_dir.exists() {
-            fs::create_dir_all(&conf_dir)?;
-            info!("Created config directory at {conf_dir:?}");
-        }
+    pub fn new(conf_dir: PathBuf) -> Self {
+        let logs_path = conf_dir.join("logs");
+        let db_path = conf_dir.join("data.db");
         let conf_path = conf_dir.join("config.yaml");
-        if !conf_path.exists() {
-            let config = Config::default();
-            let file = fs::File::create(&conf_path)?;
-            serde_norway::to_writer(&file, &config)?;
-            info!("Default config written to {:?}", conf_path);
-            Ok(config)
-        } else {
-            let file = fs::File::open(&conf_path)?;
-            let config: Config = serde_norway::from_reader(&file)?;
-            info!("Configuration loaded successfully");
-            Ok(config)
+
+        Self {
+            pomodoro: Default::default(),
+            logs_path,
+            db_path,
+            conf_path,
+            conf_dir,
         }
     }
 
+    pub fn load(&mut self) -> Result<(), ConfigError> {
+        let conf_dir = &self.conf_dir;
+        let conf_path = &self.conf_path;
+
+        debug!("config directory: {:?}", conf_dir);
+        if !conf_dir.exists() {
+            fs::create_dir_all(conf_dir)?;
+            info!("created config directory at {conf_dir:?}");
+        }
+
+        let config = if !conf_path.exists() {
+            let config = Config::default();
+            let file = fs::File::create(conf_path)?;
+            serde_norway::to_writer(&file, &config)?;
+            info!("written default config to {:?}", conf_path);
+            config
+        } else {
+            let file = fs::File::open(conf_path)?;
+            let config = serde_norway::from_reader(&file)?;
+            info!("loaded configuration");
+            config
+        };
+        let conf_dir = self.conf_dir.clone();
+        let conf_path = self.conf_path.clone();
+        *self = config;
+        self.conf_dir = conf_dir;
+        self.conf_path = conf_path;
+        Ok(())
+    }
+
     pub fn save(&self) -> Result<(), ConfigError> {
-        let conf_dir = utils::conf_dir();
-        let conf_path = conf_dir.join("config.yaml");
-        let file = fs::File::create(&conf_path)?;
+        let file = fs::File::create(&self.conf_path)?;
         serde_norway::to_writer(&file, self)?;
         info!("Configuration saved successfully");
         Ok(())
