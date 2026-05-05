@@ -163,6 +163,11 @@ impl Pomodoro {
         self.long_interval
     }
 
+    /// Remaining focus sessions before a long interval session
+    pub fn before_long_break(&self) -> u32 {
+        self.long_interval() - (self.focus_sessions % self.long_interval())
+    }
+
     /// Gets session duration based on current mode.
     pub fn session_duration(&self) -> Duration {
         match self.mode {
@@ -438,5 +443,36 @@ mod tests {
 
         let total_after_second_pause = pomo.total_time();
         assert!(total_after_second_pause >= total_after_pause + Duration::from_millis(40));
+    }
+
+    #[test]
+    fn test_before_long_interval() {
+        let mut pomo = Pomodoro {
+            long_interval: 3,
+            ..Default::default()
+        };
+        // focus
+
+        assert_eq!(pomo.before_long_break(), 3);
+
+        pomo.skip();
+        // short break
+        assert_eq!(pomo.before_long_break(), 2);
+
+        pomo.skip();
+        // focus
+        assert_eq!(pomo.before_long_break(), 2);
+
+        pomo.skip();
+        // short break
+        assert_eq!(pomo.before_long_break(), 1);
+
+        pomo.skip();
+        // focus
+        assert_eq!(pomo.before_long_break(), 1);
+
+        pomo.skip();
+        // long break
+        assert_eq!(pomo.before_long_break(), 3);
     }
 }

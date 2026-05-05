@@ -43,13 +43,7 @@ impl TuiTimerView {
         self.state(rows[1], buf, mode, paused);
         self.timer(rows[3], buf, &remaining, mode);
         self.progress_bar(rows[4], buf, progress, mode);
-        self.stats(
-            rows[6],
-            buf,
-            state.long_interval(),
-            state.total_sessions(),
-            state.focus_sessions(),
-        );
+        self.stats(rows[6], buf, state);
         self.keybinds(rows[8], buf, show_binds);
         self.prompt(area, buf, state);
     }
@@ -150,14 +144,11 @@ impl TuiTimerView {
             .render(area, buf);
     }
 
-    fn stats(
-        &self,
-        area: Rect,
-        buf: &mut Buffer,
-        long_interval: u32,
-        total_sessions: u32,
-        focus_sessions: u32,
-    ) {
+    fn stats(&self, area: Rect, buf: &mut Buffer, state: &Pomodoro) {
+        let long_interval = state.long_interval();
+        let total_sessions = state.total_sessions();
+        let focus_sessions = state.focus_sessions();
+        let before_long_break = state.before_long_break();
         let dim = Style::default().dim();
         let bright = Style::default();
         let line = Line::from(vec![
@@ -167,6 +158,7 @@ impl TuiTimerView {
             Span::styled(total_sessions.to_string(), bright),
             Span::styled("  │  Long break every: ", dim),
             Span::styled(long_interval.to_string(), bright),
+            Span::styled(format!(" (in {before_long_break} focus sessions)"), dim),
         ]);
 
         Paragraph::new(line)
