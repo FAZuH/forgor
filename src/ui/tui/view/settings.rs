@@ -487,12 +487,12 @@ impl TuiSettingsView {
         Some(path)
     }
 
-    fn parse_dur(&mut self, s: impl AsRef<str>) -> Result<Duration, SettingsCmd> {
+    fn parse_dur(&self, s: impl AsRef<str>) -> Result<Duration, SettingsCmd> {
         self.try_parse(s, |s| s.parse::<u64>(), "integer")
             .map(|val| Duration::from_secs(val * 60))
     }
 
-    fn parse_vol(&mut self, s: impl AsRef<str>) -> Result<Percentage, SettingsCmd> {
+    fn parse_vol(&self, s: impl AsRef<str>) -> Result<Percentage, SettingsCmd> {
         let s = s.as_ref();
         if s.is_empty() {
             Ok(Percentage::default())
@@ -502,7 +502,7 @@ impl TuiSettingsView {
     }
 
     fn try_parse<T, E: std::fmt::Debug>(
-        &mut self,
+        &self,
         s: impl AsRef<str>,
         f: impl for<'a> FnOnce(&'a str) -> Result<T, E>,
         label: &str,

@@ -7,7 +7,6 @@ use crate::model::Mode;
 use crate::model::Pomodoro;
 use crate::repo::model::PomodoroState;
 use crate::ui::prelude::*;
-use crate::ui::router::RouterCmd;
 
 // type IPomodoro = Box<dyn Updateable<PomodoroMsg, PomodoroCmd>>;
 
@@ -67,26 +66,42 @@ pub enum Cmd {
     // Views
 }
 
-pub struct AppCore {
+pub struct AppCore<E: EffectHandler> {
     pomodoro: Pomodoro,
     config: Config,
     router: Router,
+    effects: E,
 
     active_session_id: Option<i32>,
     config_snapshot: Config,
     is_prompting_transition: bool,
 }
 
-impl AppCore {
-    pub fn new(pomodoro: Pomodoro, config: Config) -> Self {
+impl<E: EffectHandler> AppCore<E> {
+    pub fn new(pomodoro: Pomodoro, config: Config, effects: E) -> Self {
         Self {
-            // pomodoro: Box::new(pomodoro),
+            effects,
             pomodoro,
             router: Router::new(Page::Timer),
             config_snapshot: config.clone(),
             config,
             active_session_id: None,
             is_prompting_transition: false,
+        }
+    }
+
+    /// Dispatch a message and process all resulting effects
+    /// synchronously until the message queue is drained.
+    pub fn dispatch(&mut self, msg: Msg) {
+        let cmds = self.update(msg);
+        for cmd in cmds {
+            self.execute_effect(cmd);
+        }
+    }
+
+    pub fn execute_effect(&mut self, cmd: Cmd) {
+        for res in self.effects.execute(cmd) {
+            self.dispatch(res);
         }
     }
 
@@ -108,6 +123,14 @@ impl AppCore {
         &self.config
     }
 
+    pub fn effects(&self) -> &E {
+        &self.effects
+    }
+
+    pub fn effects_mut(&mut self) -> &mut E {
+        &mut self.effects
+    }
+
     pub fn is_prompting_transition(&self) -> bool {
         self.is_prompting_transition
     }
@@ -117,7 +140,7 @@ impl AppCore {
     }
 }
 
-impl Updateable<Msg, Cmd> for AppCore {
+impl<E: EffectHandler> Updateable<Msg, Cmd> for AppCore<E> {
     fn update(&mut self, msg: Msg) -> Vec<Cmd> {
         let mut ret = Vec::new();
         match msg {
@@ -150,7 +173,7 @@ impl Updateable<Msg, Cmd> for AppCore {
     }
 }
 
-impl AppCore {
+impl<E: EffectHandler> AppCore<E> {
     fn handle_tick(&mut self) -> Vec<Cmd> {
         let mut ret = vec![];
 
@@ -238,7 +261,7 @@ impl AppCore {
     }
 }
 
-impl AppCore {
+impl<E: EffectHandler> AppCore<E> {
     fn translate_pomodoro_cmd(&mut self, cmd: PomodoroCmd) -> Vec<Cmd> {
         let mut ret = Vec::new();
         match cmd {

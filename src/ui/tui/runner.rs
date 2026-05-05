@@ -12,7 +12,6 @@ use crate::ui::UiError;
 use crate::ui::core::Cmd;
 use crate::ui::core::Msg;
 use crate::ui::prelude::*;
-use crate::ui::runtime::Runtime;
 use crate::ui::tui::TuiEffectHandler;
 use crate::ui::tui::TuiError;
 use crate::ui::tui::backend::Tui;
@@ -23,7 +22,7 @@ pub struct TuiRunner {
     tick: TickTimer,
     redraw: bool,
 
-    runtime: Runtime<TuiEffectHandler>,
+    core: AppCore<TuiEffectHandler>,
     terminal: Tui,
 
     timer: TuiTimerView,
@@ -37,46 +36,46 @@ impl Runner for TuiRunner {
 }
 
 macro_rules! dsp {
-    ($self:ident, runtime, $page:expr) => {{
-        $self.runtime.update($page);
+    ($self:ident, core, $page:expr) => {{
+        $self.core.update($page);
         $self.redraw = true;
     }};
     ($self:ident, pomo, $msg:expr) => {{
         log::trace!("msg config: {:?}", $msg);
-        $self.runtime.dispatch(Msg::Pomodoro($msg));
+        $self.core.dispatch(Msg::Pomodoro($msg));
         $self.redraw = true;
     }};
     ($self:ident, config, $msg:expr) => {{
         log::trace!("msg config: {:?}", $msg);
-        $self.runtime.dispatch(Msg::Config($msg));
+        $self.core.dispatch(Msg::Config($msg));
         $self.redraw = true;
     }};
     ($self:ident, router, $page:expr) => {{
-        $self.runtime.dispatch(Msg::Router($page));
+        $self.core.dispatch(Msg::Router($page));
         $self.redraw = true;
     }};
     ($self:ident, timer, $msg:expr) => {{
         log::trace!("msg timer: {:?}", $msg);
         let cmds = $self.timer.update($msg);
         for cmd in cmds {
-            $self.runtime.dispatch(Msg::ViewTimerCmd(cmd));
+            $self.core.dispatch(Msg::ViewTimerCmd(cmd));
         }
         $self.redraw = true;
     }};
     ($self:ident, setting, $msg:expr) => {{
         let cmds = $self.settings.update($msg);
         for cmd in cmds {
-            $self.runtime.dispatch(Msg::ViewSettingsCmd(cmd));
+            $self.core.dispatch(Msg::ViewSettingsCmd(cmd));
         }
         $self.redraw = true;
     }};
 }
 
 impl TuiRunner {
-    pub fn new(runtime: Runtime<TuiEffectHandler>) -> Result<Self, UiError> {
+    pub fn new(core: AppCore<TuiEffectHandler>) -> Result<Self, UiError> {
         let terminal = Tui::new()?;
         Ok(Self {
-            runtime,
+            core,
             terminal,
             timer: TuiTimerView::new(),
             settings: TuiSettingsView::new(),
@@ -87,20 +86,14 @@ impl TuiRunner {
 
     fn run_loop(&mut self) -> Result<(), TuiError> {
         // Initial dispatch for auto-start.
-        let auto_start = self
-            .runtime
-            .core()
-            .config()
-            .pomodoro
-            .timer
-            .auto_start_on_launch;
+        let auto_start = self.core.config().pomodoro.timer.auto_start_on_launch;
         if auto_start {
             dsp!(self, pomo, PomodoroMsg::Start);
         } else {
             dsp!(self, pomo, PomodoroMsg::StartPaused);
         }
 
-        while !self.runtime.core().router().is_quit() {
+        while !self.core.router().is_quit() {
             self.render_terminal()?;
             self.tick();
             self.handle_inputs()?;
@@ -112,16 +105,14 @@ impl TuiRunner {
         if self.take_redraw() {
             self.sync_views();
 
-            let (core, effects) = self.runtime.split_mut();
-
             self.terminal.draw(|f| {
-                match core.router().active_page() {
-                    Some(Page::Timer) => self.timer.render(f, core.pomodoro()),
-                    Some(Page::Settings) => self.settings.render(f, core.config()),
+                match self.core.router().active_page() {
+                    Some(Page::Timer) => self.timer.render(f, self.core.pomodoro()),
+                    Some(Page::Settings) => self.settings.render(f, self.core.config()),
                     None => {}
                 }
 
-                let toast = effects.toast_mut();
+                let toast = self.core.effects_mut().toast_mut();
                 toast.set_area(f.area());
                 f.render_widget(&**toast, f.area());
             })?;
@@ -131,17 +122,15 @@ impl TuiRunner {
 
     fn tick(&mut self) {
         if self.tick.new_tick() {
-            self.runtime.effects_mut().toast_mut().tick();
-            self.runtime.dispatch(Msg::Tick);
+            self.core.effects_mut().toast_mut().tick();
+            self.core.dispatch(Msg::Tick);
             self.redraw();
         }
     }
 
     fn sync_views(&mut self) {
-        let core = self.runtime.core();
-
-        let is_trans = core.is_prompting_transition();
-        let changes = core.is_config_dirty();
+        let is_trans = self.core.is_prompting_transition();
+        let changes = self.core.is_config_dirty();
 
         dsp!(self, timer, TimerMsg::SetPromptTransition(is_trans));
         dsp!(self, setting, SettingsMsg::SetUnsavedChanges(changes));
@@ -165,7 +154,7 @@ impl TuiRunner {
                     }
                 }
                 self.common_handler(&event);
-                match self.runtime.core().router().active_page() {
+                match self.core.router().active_page() {
                     Some(Page::Settings) => self.handle_settings(event),
                     Some(Page::Timer) => self.handle_timer(event),
                     None => dsp!(self, router, RouterMsg::Quit),
@@ -179,7 +168,7 @@ impl TuiRunner {
         if let Event::Key(key) = event
             && let KeyCode::Char('m') = key.code
         {
-            self.runtime.execute_effect(Cmd::StopSound)
+            self.core.execute_effect(Cmd::StopSound)
         }
     }
 
@@ -237,7 +226,7 @@ impl TuiRunner {
                     if sel.is_toggle() {
                         dsp!(self, setting, ApplyEdit(sel.into()));
                     } else {
-                        let pomo = &self.runtime.core().config().pomodoro;
+                        let pomo = &self.core.config().pomodoro;
                         dsp!(self, setting, StartEdit(pomo));
                     }
                 }

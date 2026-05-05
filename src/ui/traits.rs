@@ -1,7 +1,15 @@
 use crate::ui::UiError;
+use crate::ui::prelude::*;
 
+/// backend-specific effect ui runner.
 pub trait Runner {
     fn run(&mut self) -> Result<(), UiError>;
+}
+
+/// backend-specific effect execution.
+pub trait EffectHandler {
+    /// Execute a command and return any result messages.
+    fn execute(&mut self, cmd: Cmd) -> Vec<Msg>;
 }
 
 pub trait Updateable<M, C> {
