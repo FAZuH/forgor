@@ -1,21 +1,12 @@
-use crate::config::Hooks;
-use crate::model::Mode;
-
-pub fn run_cmds(conf: &Hooks, state: Mode) {
-    let cmd = match state {
-        Mode::Focus => conf.focus.clone(),
-        Mode::LongBreak => conf.long.clone(),
-        Mode::ShortBreak => conf.short.clone(),
+pub fn run_hook_command(cmd: &str) {
+    let Some(parts) = shlex::split(cmd) else {
+        log::error!("failed to parse hook command: {}", cmd);
+        return;
     };
+    let mut parts = parts.into_iter();
+    let Some(prog) = parts.next() else { return };
 
     std::thread::spawn(move || {
-        let Some(parts) = shlex::split(&cmd) else {
-            log::error!("failed to parse hook command: {}", cmd);
-            return;
-        };
-        let mut parts = parts.into_iter();
-        let Some(prog) = parts.next() else { return };
-
         let output = std::process::Command::new(prog)
             .args(parts)
             .stdout(std::process::Stdio::null())

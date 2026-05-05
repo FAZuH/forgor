@@ -31,11 +31,8 @@ pub enum PomodoroCmd {
     SessionSkipped,
 }
 
-impl Updateable for Pomodoro {
-    type Msg = PomodoroMsg;
-    type Cmd = PomodoroCmd;
-
-    fn update(&mut self, msg: Self::Msg) -> Vec<Self::Cmd> {
+impl Updateable<PomodoroMsg, PomodoroCmd> for Pomodoro {
+    fn update(&mut self, msg: PomodoroMsg) -> Vec<PomodoroCmd> {
         use PomodoroMsg::*;
         let mut cmds = vec![];
         match msg {
@@ -86,7 +83,7 @@ impl Updateable for Pomodoro {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimerMsg {
-    SetPromptNextSession(bool),
+    SetPromptTransition(bool),
     PromptNextSessionAnswerYes(bool),
     SetShowKeybinds(bool),
     ToggleShowKeybinds,

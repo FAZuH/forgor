@@ -12,6 +12,7 @@ use strum::VariantArray;
 
 use crate::config::Config;
 use crate::config::Percentage;
+use crate::config::PomodoroConfig;
 use crate::ui::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, EnumDiscriminants, EnumCount, EnumMessage, FromRepr)]
@@ -81,11 +82,8 @@ pub enum ConfigCmd {
     None,
 }
 
-impl Updateable for Config {
-    type Msg = ConfigMsg;
-    type Cmd = ConfigCmd;
-
-    fn update(&mut self, msg: Self::Msg) -> Vec<Self::Cmd> {
+impl Updateable<ConfigMsg, ConfigCmd> for Config {
+    fn update(&mut self, msg: ConfigMsg) -> Vec<ConfigCmd> {
         use ConfigMsg::*;
         let timer = &mut self.pomodoro.timer;
         let hook = &mut self.pomodoro.hook;
@@ -118,25 +116,29 @@ impl Updateable for Config {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum SettingsMsg {
-    SelectUp,
-    SelectDown,
-    SectionPrev,
-    SectionNext,
-    SectionSelect(u32),
-    ScrollUp,
-    ScrollDown,
-    // StartEditing(PomodoroConfig),
+pub enum SettingsMsg<'a> {
+    /// Carries a ConfigMsg constructed by the view layer (post-split flow).
+    ApplyEdit(ConfigMsg),
+    StartEdit(&'a PomodoroConfig),
     CancelEditing,
-    SetUnsavedChanges(bool),
-    SetShowKeybinds(bool),
-    ToggleShowKeybinds,
+    SaveConfig,
     SaveEdit,
+    ScrollDown,
+    ScrollUp,
+    SectionNext,
+    SectionPrev,
+    SectionSelect(u32),
+    SelectDown,
+    SelectUp,
+    SetShowKeybinds(bool),
+    SetUnsavedChanges(bool),
+    ToggleShowKeybinds,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SettingsCmd {
     SaveEdit(ConfigMsg),
+    SaveConfig,
     ShowToast { message: String, r#type: ToastType },
 }
 
