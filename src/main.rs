@@ -22,7 +22,14 @@ type View = Box<dyn Runner>;
 
 fn main() -> Result<(), AppError> {
     let cli = Cli::parse();
-    let conf = Config::load()?;
+
+    let mut conf = if let Some(ref conf) = cli.config_path {
+        Config::new(conf.clone())
+    } else {
+        Config::default()
+    };
+    conf.load()?;
+
     setup_logging(&conf.logs_path)?;
     color_eyre::install().unwrap();
     info!("initializing {} v{}", tomo::APP_NAME, tomo::APP_VERSION);
