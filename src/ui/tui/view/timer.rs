@@ -264,6 +264,9 @@ static KEYBINDS_ON: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
             Span::styled(": Quit", dim),
         ]),
         Line::from(vec![
+            Span::styled("m", bright),
+            Span::styled(": Stop alarm", dim),
+            sep.clone(),
             Span::styled("s", bright),
             Span::styled(": Settings", dim),
             sep.clone(),
