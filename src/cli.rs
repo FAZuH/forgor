@@ -7,22 +7,22 @@ use clap::Parser;
 #[derive(Parser, Debug, Clone)]
 #[command(name = crate::APP_NAME, version, about)]
 pub struct Cli {
-    #[arg(short, long, value_parser = atodur)]
+    #[arg(short, long, value_parser = atodur, help = "Focus session duration (e.g. 1h 1m 1s)")]
     pub focus: Option<Duration>,
 
-    #[arg(short, long, value_parser = atodur)]
+    #[arg(short, long, value_parser = atodur, help = "Short break duration (e.g. 1h 1m 1s)")]
     pub short_break: Option<Duration>,
 
-    #[arg(short, long, value_parser = atodur)]
+    #[arg(short, long, value_parser = atodur, help = "Long break duration (e.g. 1h 1m 1s)")]
     pub long_break: Option<Duration>,
 
-    #[arg(short = 'L', long, value_parser = |a: &str| a.parse::<u32>())]
+    #[arg(short = 'L', long, value_parser = |a: &str| a.parse::<u32>(), help = "Number of focus sessions before a long break")]
     pub long_interval: Option<u32>,
 
     #[arg(short, long, help = "Start tracking a task by name (created if not exists)")]
     pub task: Option<String>,
 
-    #[arg(short, long)]
+    #[arg(short, long, help = "Path to config directory")]
     pub config_path: Option<PathBuf>,
 }
 
