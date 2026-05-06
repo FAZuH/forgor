@@ -91,6 +91,7 @@ pub struct AppCore<E: EffectHandler> {
     router: Router,
     effects: E,
 
+    current_task_id: Option<i32>,
     active_session_id: Option<i32>,
     config_snapshot: Config,
     overlay: Option<Overlay>,
@@ -107,7 +108,13 @@ pub enum Overlay {
 }
 
 impl<E: EffectHandler> AppCore<E> {
-    pub fn new(pomodoro: Pomodoro, config: Config, effects: E, is_duplicate: bool) -> Self {
+    pub fn new(
+        pomodoro: Pomodoro,
+        config: Config,
+        effects: E,
+        is_duplicate: bool,
+        initial_task_id: Option<i32>,
+    ) -> Self {
         let overlay = if is_duplicate {
             Some(Overlay::DuplicateWarning)
         } else {
@@ -121,6 +128,7 @@ impl<E: EffectHandler> AppCore<E> {
             config_snapshot: config.clone(),
             config,
 
+            current_task_id: initial_task_id,
             active_session_id: None,
             overlay,
             is_quit: false,
@@ -392,19 +400,19 @@ mod tests {
 
     #[test]
     fn duplicate_on_launch() {
-        let core = AppCore::new(test_pomodoro(), test_config(), MockEffects, true);
+        let core = AppCore::new(test_pomodoro(), test_config(), MockEffects, true, None);
         assert_eq!(core.overlay(), Some(Overlay::DuplicateWarning));
     }
 
     #[test]
     fn no_duplicate_no_overlay() {
-        let core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false);
+        let core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false, None);
         assert_eq!(core.overlay(), None);
     }
 
     #[test]
     fn tick_updates_active_session() {
-        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false);
+        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false, None);
         core.update(Msg::SessionCreated { id: 42 });
 
         let cmds = core.update(Msg::Tick);
@@ -417,7 +425,7 @@ mod tests {
 
     #[test]
     fn tick_without_session() {
-        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false);
+        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false, None);
         let cmds = core.update(Msg::Tick);
 
         assert!(!cmds.iter().any(|c| matches!(c, Cmd::UpdateSession { .. })));
@@ -425,7 +433,7 @@ mod tests {
 
     #[test]
     fn quit_with_dirty_config_shows_warning() {
-        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false);
+        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false, None);
         let _ = core.update(Msg::Config(ConfigMsg::TimerAutoFocus));
 
         let cmds = core.update(Msg::Quit);
@@ -437,7 +445,7 @@ mod tests {
 
     #[test]
     fn quit_with_clean_config_exits() {
-        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false);
+        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false, None);
         let cmds = core.update(Msg::Quit);
 
         assert!(core.is_quit());
@@ -447,7 +455,7 @@ mod tests {
 
     #[test]
     fn overlay_dismiss_messages() {
-        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false);
+        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false, None);
 
         core.set_overlay(Some(Overlay::DuplicateWarning));
         core.update(Msg::DuplicateWarningDismiss);
@@ -464,7 +472,7 @@ mod tests {
 
     #[test]
     fn reset_warning_proceed() {
-        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false);
+        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false, None);
         core.set_overlay(Some(Overlay::ResetWarning));
 
         let _cmds = core.update(Msg::ResetWarningProceed);
@@ -474,7 +482,7 @@ mod tests {
 
     #[test]
     fn reset_warning_show() {
-        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false);
+        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false, None);
         assert_eq!(core.overlay(), None);
 
         core.update(Msg::ResetWarningShow);
@@ -483,7 +491,7 @@ mod tests {
 
     #[test]
     fn unsaved_warning_save_and_quit() {
-        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false);
+        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false, None);
         core.set_overlay(Some(Overlay::UnsavedWarning));
 
         let cmds = core.update(Msg::UnsavedWarningSave);
@@ -495,7 +503,7 @@ mod tests {
 
     #[test]
     fn unsaved_warning_quit() {
-        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false);
+        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false, None);
         core.set_overlay(Some(Overlay::UnsavedWarning));
 
         core.update(Msg::UnsavedWarningQuit);
@@ -504,7 +512,7 @@ mod tests {
 
     #[test]
     fn duplicate_warning_quit() {
-        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false);
+        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false, None);
         core.set_overlay(Some(Overlay::DuplicateWarning));
 
         let cmds = core.update(Msg::DuplicateWarningQuit);
@@ -513,7 +521,7 @@ mod tests {
 
     #[test]
     fn config_saved_ok() {
-        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false);
+        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false, None);
         let _ = core.update(Msg::Config(ConfigMsg::TimerAutoFocus));
         assert!(core.is_config_dirty());
 
@@ -531,7 +539,7 @@ mod tests {
 
     #[test]
     fn config_saved_err() {
-        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false);
+        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false, None);
         let _ = core.update(Msg::Config(ConfigMsg::TimerAutoFocus));
         assert!(core.is_config_dirty());
 
@@ -555,7 +563,7 @@ mod tests {
             Duration::from_mins(5),
             4,
         );
-        let mut core = AppCore::new(pomo, test_config(), MockEffects, false);
+        let mut core = AppCore::new(pomo, test_config(), MockEffects, false, None);
 
         core.update(Msg::Pomodoro(PomodoroMsg::Start));
         core.update(Msg::SessionCreated { id: 1 });
@@ -580,7 +588,7 @@ mod tests {
         let mut config = test_config();
         config.pomodoro.timer.auto_focus = true;
 
-        let mut core = AppCore::new(pomo, config, MockEffects, false);
+        let mut core = AppCore::new(pomo, config, MockEffects, false, None);
         core.update(Msg::Pomodoro(PomodoroMsg::Start));
         core.update(Msg::SessionCreated { id: 1 });
 
@@ -601,7 +609,7 @@ mod tests {
             Duration::from_mins(5),
             4,
         );
-        let mut core = AppCore::new(pomo, test_config(), MockEffects, false);
+        let mut core = AppCore::new(pomo, test_config(), MockEffects, false, None);
 
         core.update(Msg::Pomodoro(PomodoroMsg::Start));
         core.update(Msg::SessionCreated { id: 1 });

@@ -124,6 +124,7 @@ mod tests {
             Config::new(PathBuf::from("/tmp/test_tomo_config")),
             MockEffects,
             false,
+            None,
         )
     }
 

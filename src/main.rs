@@ -47,6 +47,13 @@ fn main() -> Result<(), AppError> {
     let is_duplicate_instance = _guard.is_err();
 
     let repo = repo(&conf.db_path);
+    let initial_task = cli.task.clone().map(|name| {
+        repo.task()
+            .find_by_name(name.clone())
+            .map(|t| t.id)
+            .unwrap_or_else(|_| repo.task().add(name).unwrap().id)
+    });
+
     let sound = alarm();
     let notify = notify();
     let pomo = pomodoro(&cli, &conf);
@@ -55,7 +62,15 @@ fn main() -> Result<(), AppError> {
         repo.session().close_all_sessions().unwrap();
     }
 
-    let mut runner = view(conf, repo, sound, notify, pomo, is_duplicate_instance);
+    let mut runner = view(
+        conf,
+        repo,
+        sound,
+        notify,
+        pomo,
+        is_duplicate_instance,
+        initial_task,
+    );
     info!("starting view");
     runner.run().unwrap();
     Ok(())
@@ -68,13 +83,14 @@ fn view(
     notify: Notify,
     pomo: Pomodoro,
     is_duplicate: bool,
+    initial_task_id: Option<i32>,
 ) -> View {
     use tomo::ui::core::AppCore;
     use tomo::ui::tui::TuiEffectHandler;
     use tomo::ui::tui::TuiRunner;
 
     let effect = TuiEffectHandler::new(sound, notify, repo);
-    let core = AppCore::new(pomo, conf, effect, is_duplicate);
+    let core = AppCore::new(pomo, conf, effect, is_duplicate, initial_task_id);
 
     Box::new(TuiRunner::new(core).unwrap())
 }
