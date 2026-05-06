@@ -1,6 +1,6 @@
 pub use super::core::AppCore;
-pub use super::core::Cmd;
 pub use super::core::ConfigSaveResult;
+pub use super::core::Effect;
 pub use super::core::Msg;
 pub use super::router::Page;
 pub use super::router::Router;

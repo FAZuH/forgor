@@ -9,7 +9,7 @@ use tui_widgets::prompts::State;
 use tui_widgets::prompts::Status;
 
 use crate::ui::UiError;
-use crate::ui::core::Cmd;
+use crate::ui::core::Effect;
 use crate::ui::core::Msg;
 use crate::ui::core::Overlay;
 use crate::ui::prelude::*;
@@ -208,7 +208,7 @@ impl TuiRunner {
     fn common_handler(&mut self, event: &Event) {
         match event {
             Event::Key(key) => match key.code {
-                KeyCode::Char('m') => self.core.execute_effect(Cmd::StopSound),
+                KeyCode::Char('m') => self.core.execute_effect(Effect::StopSound),
                 KeyCode::Char('q') => self.dispatch_core(Msg::Quit),
                 _ => {}
             },

@@ -38,49 +38,49 @@ impl TuiEffectHandler {
 }
 
 impl EffectHandler for TuiEffectHandler {
-    fn execute(&mut self, cmd: Cmd) -> Vec<Msg> {
+    fn execute(&mut self, cmd: Effect) -> Vec<Msg> {
         let mut ret = Vec::new();
         match cmd {
-            Cmd::PlaySound(alarm) => {
+            Effect::PlaySound(alarm) => {
                 if !self.sound.is_playing() {
                     self.sound.set_sound(alarm);
                     let _ = self.sound.play();
                 }
             }
-            Cmd::StopSound => {
+            Effect::StopSound => {
                 let _ = self.sound.stop();
             }
-            Cmd::SendNotification(mode) => {
+            Effect::SendNotification(mode) => {
                 let result = self.notify.send(mode);
                 ret.push(Msg::NotificationSent(result));
             }
-            Cmd::NewSession { task_id, state } => {
-                let session = self.repo.session().new_session(task_id, state).unwrap();
+            Effect::NewSession { task_id, mode } => {
+                let session = self.repo.session().new_session(task_id, mode).unwrap();
                 ret.push(Msg::SessionCreated { id: session.id });
             }
-            Cmd::UpdateSession { id } => {
+            Effect::UpdateSession { id } => {
                 let _ = self.repo.session().update(id);
                 ret.push(Msg::SessionUpdated);
             }
-            Cmd::EndSession { id } => {
+            Effect::EndSession { id } => {
                 let _ = self.repo.session().end_session(id);
                 ret.push(Msg::SessionEnded);
             }
-            Cmd::CloseAllSessions => {
+            Effect::CloseAllSessions => {
                 let _ = self.repo.session().close_all_sessions();
                 ret.push(Msg::SessionsClosed);
             }
-            Cmd::SaveConfig(config) => {
+            Effect::SaveConfig(config) => {
                 let result: Result<(), String> = config.save().map_err(|e| e.to_string());
                 ret.push(Msg::ConfigSaved(ConfigSaveResult::from(result)));
             }
-            Cmd::RunHook(command) => {
+            Effect::RunHook(command) => {
                 run_hook_command(&command);
             }
-            Cmd::ShowToast { message, kind } => {
+            Effect::ShowToast { message, kind } => {
                 self.toast.show(message, kind);
             }
-            Cmd::Quit => {
+            Effect::Quit => {
                 let _ = self.sound.stop();
             }
         }

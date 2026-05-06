@@ -54,7 +54,7 @@ pub enum Msg {
 
 /// Side-effects to be executed by the EffectHandler.
 #[derive(Debug, Clone, PartialEq)]
-pub enum Cmd {
+pub enum Effect {
     Quit,
     // Sound
     PlaySound(Alarm),
@@ -143,7 +143,7 @@ impl<E: EffectHandler> AppCore<E> {
         }
     }
 
-    pub fn execute_effect(&mut self, cmd: Cmd) {
+    pub fn execute_effect(&mut self, cmd: Effect) {
         for res in self.effects.execute(cmd) {
             self.dispatch(res);
         }
@@ -196,8 +196,8 @@ impl<E: EffectHandler> AppCore<E> {
     }
 }
 
-impl<E: EffectHandler> Updateable<Msg, Cmd> for AppCore<E> {
-    fn update(&mut self, msg: Msg) -> Vec<Cmd> {
+impl<E: EffectHandler> Updateable<Msg, Effect> for AppCore<E> {
+    fn update(&mut self, msg: Msg) -> Vec<Effect> {
         let mut ret = Vec::new();
         match msg {
             Msg::Pomodoro(msg) => {
@@ -247,23 +247,23 @@ impl<E: EffectHandler> Updateable<Msg, Cmd> for AppCore<E> {
 }
 
 impl<E: EffectHandler> AppCore<E> {
-    fn handle_quit(&mut self) -> Vec<Cmd> {
+    fn handle_quit(&mut self) -> Vec<Effect> {
         let mut ret = vec![];
         if self.is_config_dirty() {
             self.overlay = Some(Overlay::UnsavedWarning);
         } else {
             self.is_quit = true;
-            ret.push(Cmd::Quit);
+            ret.push(Effect::Quit);
         }
         ret
     }
 
-    fn handle_tick(&mut self) -> Vec<Cmd> {
+    fn handle_tick(&mut self) -> Vec<Effect> {
         let mut ret = vec![];
 
         // Bump the session timestamp on every tick.
         if let Some(id) = self.active_session_id {
-            ret.push(Cmd::UpdateSession { id });
+            ret.push(Effect::UpdateSession { id });
         }
 
         ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::Tick)));
@@ -271,32 +271,32 @@ impl<E: EffectHandler> AppCore<E> {
         ret
     }
 
-    fn handle_config_saved(&mut self, result: ConfigSaveResult) -> Vec<Cmd> {
+    fn handle_config_saved(&mut self, result: ConfigSaveResult) -> Vec<Effect> {
         match result {
             ConfigSaveResult::Ok => {
                 self.config_snapshot = self.config.clone();
-                vec![Cmd::ShowToast {
+                vec![Effect::ShowToast {
                     message: "Settings saved!".into(),
                     kind: ToastType::Success,
                 }]
             }
-            ConfigSaveResult::Err(e) => vec![Cmd::ShowToast {
+            ConfigSaveResult::Err(e) => vec![Effect::ShowToast {
                 message: format!("Failed to save: {e}"),
                 kind: ToastType::Error,
             }],
         }
     }
 
-    pub fn take_active_session_id(&mut self) -> Option<i32> {
+    fn take_active_session_id(&mut self) -> Option<i32> {
         self.active_session_id.take()
     }
 
-    pub fn handle_session_end(&mut self, curr_mode: Mode, next_mode: Mode) -> Vec<Cmd> {
+    fn handle_session_end(&mut self, curr_mode: Mode, next_mode: Mode) -> Vec<Effect> {
         let mut ret = Vec::new();
 
         // End the active session (.take() so only fires once).
         if let Some(id) = self.active_session_id.take() {
-            ret.push(Cmd::EndSession { id });
+            ret.push(Effect::EndSession { id });
         }
 
         // Fire effects: sound, notification, hook.
@@ -309,9 +309,9 @@ impl<E: EffectHandler> AppCore<E> {
             let alarm = self.alarm_for(&next_mode, &config.pomodoro.alarm).clone();
             let hook = self.hook_for(&curr_mode, &config.pomodoro.hook).to_string();
 
-            ret.push(Cmd::SendNotification(next_mode));
-            ret.push(Cmd::PlaySound(alarm));
-            ret.push(Cmd::RunHook(hook));
+            ret.push(Effect::SendNotification(next_mode));
+            ret.push(Effect::PlaySound(alarm));
+            ret.push(Effect::RunHook(hook));
         }
 
         if auto_next {
@@ -350,13 +350,13 @@ impl<E: EffectHandler> AppCore<E> {
 }
 
 impl<E: EffectHandler> AppCore<E> {
-    pub fn translate_pomodoro_cmd(&mut self, cmd: PomodoroCmd) -> Vec<Cmd> {
+    fn translate_pomodoro_cmd(&mut self, cmd: PomodoroCmd) -> Vec<Effect> {
         let mut ret = Vec::new();
         match cmd {
             PomodoroCmd::Started(mode) => {
-                ret.push(Cmd::NewSession {
-                    task_id: None,
-                    state: mode.into(),
+                ret.push(Effect::NewSession {
+                    task_id: self.current_task_id,
+                    mode,
                 });
             }
             PomodoroCmd::StartedPaused => {}
@@ -367,36 +367,36 @@ impl<E: EffectHandler> AppCore<E> {
                 ret.extend(self.handle_session_end(curr_mode, next_mode));
             }
             PomodoroCmd::NextSession(mode) => {
-                ret.push(Cmd::NewSession {
-                    task_id: None,
-                    state: mode.into(),
+                ret.push(Effect::NewSession {
+                    task_id: self.current_task_id,
+                    mode,
                 });
             }
             PomodoroCmd::SessionPaused => {
                 if let Some(id) = self.take_active_session_id() {
-                    ret.push(Cmd::EndSession { id });
+                    ret.push(Effect::EndSession { id });
                 }
             }
             PomodoroCmd::SessionResumed(mode) => {
-                ret.push(Cmd::NewSession {
-                    task_id: None,
-                    state: mode.into(),
+                ret.push(Effect::NewSession {
+                    task_id: self.current_task_id,
+                    mode,
                 });
             }
             PomodoroCmd::SessionSkipped(mode) => {
                 if let Some(id) = self.take_active_session_id() {
-                    ret.push(Cmd::EndSession { id });
+                    ret.push(Effect::EndSession { id });
                 }
-                ret.push(Cmd::NewSession {
-                    task_id: None,
-                    state: mode.into(),
+                ret.push(Effect::NewSession {
+                    task_id: self.current_task_id,
+                    mode,
                 });
             }
         }
         ret
     }
 
-    pub fn translate_config_cmd(&mut self, cmd: ConfigCmd) -> Vec<Cmd> {
+    fn translate_config_cmd(&mut self, cmd: ConfigCmd) -> Vec<Effect> {
         let ret = vec![];
         match cmd {
             ConfigCmd::None => {}
@@ -404,7 +404,7 @@ impl<E: EffectHandler> AppCore<E> {
         ret
     }
 
-    pub fn translate_router_cmd(&mut self, cmd: RouterCmd) -> Vec<Cmd> {
+    fn translate_router_cmd(&mut self, cmd: RouterCmd) -> Vec<Effect> {
         let ret = vec![];
         match cmd {
             RouterCmd::None => {}
@@ -412,8 +412,8 @@ impl<E: EffectHandler> AppCore<E> {
         ret
     }
 
-    pub fn translate_timer_cmd(&mut self, cmd: TimerCmd) -> Vec<Cmd> {
-        let mut ret = vec![Cmd::StopSound];
+    fn translate_timer_cmd(&mut self, cmd: TimerCmd) -> Vec<Effect> {
+        let mut ret = vec![Effect::StopSound];
 
         match cmd {
             TimerCmd::PromptTransitionAnsweredYes => {
@@ -429,24 +429,40 @@ impl<E: EffectHandler> AppCore<E> {
         ret
     }
 
-    pub fn translate_settings_cmd(&mut self, cmd: SettingsCmd) -> Vec<Cmd> {
+    fn translate_settings_cmd(&mut self, cmd: SettingsCmd) -> Vec<Effect> {
         let mut ret = vec![];
         match cmd {
             SettingsCmd::SaveEdit(msg) => {
                 ret.extend(self.update(Msg::Config(msg)));
             }
             SettingsCmd::SaveConfig => {
-                ret.push(Cmd::SaveConfig(Box::new(self.config().clone())));
+                ret.push(Effect::SaveConfig(Box::new(self.config().clone())));
                 self.update_config_snapshot();
             }
             SettingsCmd::ShowToast { message, r#type } => {
-                ret.push(Cmd::ShowToast {
+                ret.push(Effect::ShowToast {
                     message,
                     kind: r#type,
                 });
             }
         }
         ret
+    }
+}
+
+/// Outcome of a config-save effect so that AppCore can update its dirty flag.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ConfigSaveResult {
+    Ok,
+    Err(String),
+}
+
+impl From<Result<(), String>> for ConfigSaveResult {
+    fn from(r: Result<(), String>) -> Self {
+        match r {
+            Ok(()) => ConfigSaveResult::Ok,
+            Err(e) => ConfigSaveResult::Err(e),
+        }
     }
 }
 
@@ -462,7 +478,7 @@ mod tests {
     use crate::ui::core::Overlay;
     struct MockEffects;
     impl EffectHandler for MockEffects {
-        fn execute(&mut self, _cmd: Cmd) -> Vec<Msg> {
+        fn execute(&mut self, _cmd: Effect) -> Vec<Msg> {
             vec![]
         }
     }
@@ -496,7 +512,7 @@ mod tests {
 
         assert!(
             cmds.iter()
-                .any(|c| matches!(c, Cmd::UpdateSession { id: 42 }))
+                .any(|c| matches!(c, Effect::UpdateSession { id: 42 }))
         );
     }
 
@@ -505,7 +521,11 @@ mod tests {
         let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false, None);
         let cmds = core.update(Msg::Tick);
 
-        assert!(!cmds.iter().any(|c| matches!(c, Cmd::UpdateSession { .. })));
+        assert!(
+            !cmds
+                .iter()
+                .any(|c| matches!(c, Effect::UpdateSession { .. }))
+        );
     }
 
     #[test]
@@ -517,7 +537,7 @@ mod tests {
 
         assert_eq!(core.overlay(), Some(Overlay::UnsavedWarning));
         assert!(!core.is_quit());
-        assert!(!cmds.iter().any(|c| matches!(c, Cmd::Quit)));
+        assert!(!cmds.iter().any(|c| matches!(c, Effect::Quit)));
     }
 
     #[test]
@@ -526,7 +546,7 @@ mod tests {
         let cmds = core.update(Msg::Quit);
 
         assert!(core.is_quit());
-        assert!(cmds.iter().any(|c| matches!(c, Cmd::Quit)));
+        assert!(cmds.iter().any(|c| matches!(c, Effect::Quit)));
         assert_eq!(core.overlay(), None);
     }
 
@@ -574,8 +594,8 @@ mod tests {
         let cmds = core.update(Msg::UnsavedWarningSave);
 
         assert_eq!(core.overlay(), None);
-        assert!(cmds.iter().any(|c| matches!(c, Cmd::SaveConfig(_))));
-        assert!(cmds.iter().any(|c| matches!(c, Cmd::Quit)));
+        assert!(cmds.iter().any(|c| matches!(c, Effect::SaveConfig(_))));
+        assert!(cmds.iter().any(|c| matches!(c, Effect::Quit)));
     }
 
     #[test]
@@ -593,7 +613,7 @@ mod tests {
         core.set_overlay(Some(Overlay::DuplicateWarning));
 
         let cmds = core.update(Msg::DuplicateWarningQuit);
-        assert!(cmds.iter().any(|c| matches!(c, Cmd::Quit)));
+        assert!(cmds.iter().any(|c| matches!(c, Effect::Quit)));
     }
 
     #[test]
@@ -607,7 +627,7 @@ mod tests {
         assert!(!core.is_config_dirty());
         assert!(cmds.iter().any(|c| matches!(
             c,
-            Cmd::ShowToast {
+            Effect::ShowToast {
                 kind: ToastType::Success,
                 ..
             }
@@ -625,7 +645,7 @@ mod tests {
         assert!(core.is_config_dirty());
         assert!(cmds.iter().any(|c| matches!(
             c,
-            Cmd::ShowToast {
+            Effect::ShowToast {
                 kind: ToastType::Error,
                 ..
             }
@@ -647,10 +667,16 @@ mod tests {
 
         let cmds = core.update(Msg::Pomodoro(PomodoroMsg::Tick));
 
-        assert!(cmds.iter().any(|c| matches!(c, Cmd::SendNotification(_))));
-        assert!(cmds.iter().any(|c| matches!(c, Cmd::PlaySound(_))));
-        assert!(cmds.iter().any(|c| matches!(c, Cmd::RunHook(_))));
-        assert!(cmds.iter().any(|c| matches!(c, Cmd::EndSession { id: 1 })));
+        assert!(
+            cmds.iter()
+                .any(|c| matches!(c, Effect::SendNotification(_)))
+        );
+        assert!(cmds.iter().any(|c| matches!(c, Effect::PlaySound(_))));
+        assert!(cmds.iter().any(|c| matches!(c, Effect::RunHook(_))));
+        assert!(
+            cmds.iter()
+                .any(|c| matches!(c, Effect::EndSession { id: 1 }))
+        );
         assert_eq!(core.overlay(), Some(Overlay::PromptingTransition));
     }
 
@@ -671,11 +697,14 @@ mod tests {
 
         let cmds = core.update(Msg::Pomodoro(PomodoroMsg::Tick));
 
-        assert!(cmds.iter().any(|c| matches!(c, Cmd::SendNotification(_))));
-        assert!(cmds.iter().any(|c| matches!(c, Cmd::PlaySound(_))));
-        assert!(cmds.iter().any(|c| matches!(c, Cmd::RunHook(_))));
+        assert!(
+            cmds.iter()
+                .any(|c| matches!(c, Effect::SendNotification(_)))
+        );
+        assert!(cmds.iter().any(|c| matches!(c, Effect::PlaySound(_))));
+        assert!(cmds.iter().any(|c| matches!(c, Effect::RunHook(_))));
         assert_eq!(core.overlay(), None);
-        assert!(cmds.iter().any(|c| matches!(c, Cmd::NewSession { .. })));
+        assert!(cmds.iter().any(|c| matches!(c, Effect::NewSession { .. })));
     }
 
     #[test]
@@ -698,22 +727,13 @@ mod tests {
         // Another tick while prompting should not fire duplicate effects
         core.update(Msg::SessionCreated { id: 2 });
         let cmds = core.update(Msg::Pomodoro(PomodoroMsg::Tick));
-        assert!(!cmds.iter().any(|c| matches!(c, Cmd::SendNotification(_))));
-        assert!(!cmds.iter().any(|c| matches!(c, Cmd::PlaySound(_))));
-        assert!(!cmds.iter().any(|c| matches!(c, Cmd::RunHook(_))));
-    }
-
-    #[test]
-    fn from_mode_to_pomodoro_state() {
-        assert_eq!(PomodoroState::from(Mode::Focus), PomodoroState::Focus);
-        assert_eq!(
-            PomodoroState::from(Mode::LongBreak),
-            PomodoroState::LongBreak
+        assert!(
+            !cmds
+                .iter()
+                .any(|c| matches!(c, Effect::SendNotification(_)))
         );
-        assert_eq!(
-            PomodoroState::from(Mode::ShortBreak),
-            PomodoroState::ShortBreak
-        );
+        assert!(!cmds.iter().any(|c| matches!(c, Effect::PlaySound(_))));
+        assert!(!cmds.iter().any(|c| matches!(c, Effect::RunHook(_))));
     }
 
     #[test]
@@ -746,6 +766,7 @@ mod tests {
             Config::new(PathBuf::from("/tmp/test_tomo_config")),
             MockEffects,
             false,
+            None,
         )
     }
 
@@ -755,7 +776,7 @@ mod tests {
         let cmds = core.translate_pomodoro_cmd(PomodoroCmd::Started(Mode::Focus));
 
         assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], Cmd::NewSession { .. }));
+        assert!(matches!(cmds[0], Effect::NewSession { .. }));
     }
 
     #[test]
@@ -774,7 +795,7 @@ mod tests {
         let cmds = core.translate_pomodoro_cmd(PomodoroCmd::SessionPaused);
 
         assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], Cmd::EndSession { id: 7 }));
+        assert!(matches!(cmds[0], Effect::EndSession { id: 7 }));
     }
 
     #[test]
@@ -791,7 +812,7 @@ mod tests {
         let cmds = core.translate_pomodoro_cmd(PomodoroCmd::SessionResumed(Mode::Focus));
 
         assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], Cmd::NewSession { .. }));
+        assert!(matches!(cmds[0], Effect::NewSession { .. }));
     }
 
     #[test]
@@ -802,8 +823,8 @@ mod tests {
         let cmds = core.translate_pomodoro_cmd(PomodoroCmd::SessionSkipped(Mode::ShortBreak));
 
         assert_eq!(cmds.len(), 2);
-        assert!(matches!(cmds[0], Cmd::EndSession { id: 3 }));
-        assert!(matches!(cmds[1], Cmd::NewSession { .. }));
+        assert!(matches!(cmds[0], Effect::EndSession { id: 3 }));
+        assert!(matches!(cmds[1], Effect::NewSession { .. }));
     }
 
     #[test]
@@ -812,7 +833,7 @@ mod tests {
         let cmds = core.translate_pomodoro_cmd(PomodoroCmd::NextSession(Mode::LongBreak));
 
         assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], Cmd::NewSession { .. }));
+        assert!(matches!(cmds[0], Effect::NewSession { .. }));
     }
 
     #[test]
@@ -840,7 +861,7 @@ mod tests {
         let mut core = test_appcore();
         let cmds = core.translate_timer_cmd(TimerCmd::PromptTransitionAnsweredYes);
 
-        assert!(matches!(cmds[0], Cmd::StopSound));
+        assert!(matches!(cmds[0], Effect::StopSound));
     }
 
     #[test]
@@ -849,7 +870,7 @@ mod tests {
         let cmds = core.translate_settings_cmd(SettingsCmd::SaveConfig);
 
         assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], Cmd::SaveConfig(_)));
+        assert!(matches!(cmds[0], Effect::SaveConfig(_)));
         assert!(!core.is_config_dirty());
     }
 
@@ -864,7 +885,7 @@ mod tests {
         assert_eq!(cmds.len(), 1);
         assert!(matches!(
             &cmds[0],
-            Cmd::ShowToast {
+            Effect::ShowToast {
                 kind: ToastType::Warning,
                 ..
             }
