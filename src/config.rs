@@ -242,3 +242,86 @@ impl Alarm {
             .unwrap_or_default()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::*;
+
+    #[test]
+    fn percentage_clamps_above() {
+        assert_eq!(Percentage::new(1.5).volume(), 1.0);
+    }
+
+    #[test]
+    fn percentage_clamps_below() {
+        assert_eq!(Percentage::new(-0.5).volume(), 0.0);
+    }
+
+    #[test]
+    fn percentage_new_in_range() {
+        assert_eq!(Percentage::new(0.75).volume(), 0.75);
+    }
+
+    #[test]
+    fn percentage_try_from_str() {
+        assert_eq!(Percentage::try_from("50").unwrap().volume(), 0.5);
+        assert_eq!(Percentage::try_from("100").unwrap().volume(), 1.0);
+    }
+
+    #[test]
+    fn percentage_try_from_str_invalid() {
+        assert!(Percentage::try_from("abc").is_err());
+    }
+
+    #[test]
+    fn percentage_display() {
+        assert_eq!(Percentage::new(0.5).to_string(), "50%");
+        assert_eq!(Percentage::new(1.0).to_string(), "100%");
+        assert_eq!(Percentage::new(0.0).to_string(), "0%");
+    }
+
+    #[test]
+    fn percentage_default() {
+        let p = Percentage::default();
+        assert_eq!(p.volume(), 0.5);
+    }
+
+    #[test]
+    fn percentage_full() {
+        assert_eq!(Percentage::full().volume(), 1.0);
+    }
+
+    #[test]
+    fn percentage_muted() {
+        assert_eq!(Percentage::muted().volume(), 0.0);
+    }
+
+    #[test]
+    fn percentage_half() {
+        assert_eq!(Percentage::half().volume(), 0.5);
+    }
+
+    #[test]
+    fn duration_as_secs_roundtrip() {
+        let dur = Duration::from_secs(300);
+        let serialized = serde_norway::to_string(&duration_as_secs_wrapper::Wrapper(dur)).unwrap();
+        let deserialized: duration_as_secs_wrapper::Wrapper =
+            serde_norway::from_str(&serialized).unwrap();
+        assert_eq!(deserialized.0, dur);
+    }
+
+    /// Minimal serde wrapper to test the `duration_as_secs` module in isolation.
+    mod duration_as_secs_wrapper {
+        use std::time::Duration;
+
+        use serde::Deserialize;
+        use serde::Serialize;
+
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        pub(super) struct Wrapper(
+            #[serde(with = "super::super::duration_as_secs")] pub(super) Duration,
+        );
+    }
+}

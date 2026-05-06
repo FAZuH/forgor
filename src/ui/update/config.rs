@@ -345,7 +345,7 @@ impl SettingsSection {
         use SettingsItem::*;
         match self {
             SettingsSection::Timer => {
-                &SettingsItem::VARIANTS[AutoStartOnLaunch as usize..=TimerAutoLong as usize]
+                &SettingsItem::VARIANTS[TimerFocus as usize..=TimerAutoLong as usize]
             }
             SettingsSection::Hook => {
                 &SettingsItem::VARIANTS[HookFocus as usize..=HookLong as usize]
@@ -372,9 +372,12 @@ pub enum ToastType {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use super::*;
+
     #[test]
-    fn item_props() {
+    fn settings_item_props() {
         assert_eq!(SettingsItem::TimerFocus.label(), "Focus");
         assert_eq!(SettingsItem::TimerFocus.label_long(), "Focus Duration");
         assert_eq!(
@@ -386,5 +389,160 @@ mod tests {
     #[test]
     fn item_toggle() {
         assert!(SettingsItem::AutoStartOnLaunch.is_toggle());
+        assert!(SettingsItem::TimerAutoFocus.is_toggle());
+        assert!(!SettingsItem::TimerFocus.is_toggle());
+    }
+
+    #[test]
+    fn item_percentage() {
+        assert!(SettingsItem::AlarmVolumeFocus.is_percentage());
+        assert!(SettingsItem::AlarmVolumeShort.is_percentage());
+        assert!(!SettingsItem::TimerFocus.is_percentage());
+    }
+
+    #[test]
+    fn item_path() {
+        assert!(SettingsItem::AlarmPathFocus.is_path());
+        assert!(SettingsItem::AlarmPathLong.is_path());
+        assert!(!SettingsItem::TimerFocus.is_path());
+    }
+
+    #[test]
+    fn item_index_roundtrip() {
+        assert_eq!(
+            SettingsItem::from_index(SettingsItem::TimerFocus.index()),
+            Some(SettingsItem::TimerFocus)
+        );
+        assert_eq!(
+            SettingsItem::from_index(SettingsItem::AlarmVolumeLong.index()),
+            Some(SettingsItem::AlarmVolumeLong)
+        );
+    }
+
+    #[test]
+    fn item_section() {
+        assert_eq!(SettingsItem::TimerFocus.section(), SettingsSection::Timer);
+        assert_eq!(SettingsItem::HookFocus.section(), SettingsSection::Hook);
+        assert_eq!(
+            SettingsItem::AlarmPathFocus.section(),
+            SettingsSection::Alarm
+        );
+    }
+
+    #[test]
+    fn item_display() {
+        assert_eq!(SettingsItem::TimerFocus.to_string(), "Focus Duration");
+    }
+
+    #[test]
+    fn config_msg_display() {
+        assert_eq!(
+            ConfigMsg::TimerFocus(Duration::from_secs(60)).to_string(),
+            "Focus Duration"
+        );
+    }
+
+    #[test]
+    fn section_from_item() {
+        assert_eq!(
+            SettingsSection::from_item(SettingsItem::TimerShort),
+            SettingsSection::Timer
+        );
+        assert_eq!(
+            SettingsSection::from_item(SettingsItem::HookLong),
+            SettingsSection::Hook
+        );
+    }
+
+    #[test]
+    fn section_item_begin_idx() {
+        assert_eq!(
+            SettingsSection::Timer.item_begin_idx(),
+            SettingsItem::TimerFocus.index()
+        );
+        assert_eq!(
+            SettingsSection::Hook.item_begin_idx(),
+            SettingsItem::HookFocus.index()
+        );
+        assert_eq!(
+            SettingsSection::Alarm.item_begin_idx(),
+            SettingsItem::AlarmPathFocus.index()
+        );
+    }
+
+    #[test]
+    fn section_label() {
+        assert_eq!(SettingsSection::Timer.label(), "Timer");
+        assert_eq!(SettingsSection::Hook.label(), "Hook");
+        assert_eq!(SettingsSection::Alarm.label(), "Alarm");
+    }
+
+    #[test]
+    fn section_items_length() {
+        assert_eq!(SettingsSection::Timer.items().len(), 8);
+        assert_eq!(SettingsSection::Hook.items().len(), 3);
+        assert_eq!(SettingsSection::Alarm.items().len(), 6);
+    }
+
+    #[test]
+    fn config_update_toggle() {
+        let mut config = Config::default();
+        let auto_start = config.pomodoro.timer.auto_start_on_launch;
+
+        config.update(ConfigMsg::AutoStartOnLaunch);
+
+        assert_ne!(config.pomodoro.timer.auto_start_on_launch, auto_start);
+    }
+
+    #[test]
+    fn config_update_duration() {
+        let mut config = Config::default();
+        let new_dur = Duration::from_secs(1800);
+
+        config.update(ConfigMsg::TimerFocus(new_dur));
+
+        assert_eq!(config.pomodoro.timer.focus, new_dur);
+    }
+
+    #[test]
+    fn config_update_string() {
+        let mut config = Config::default();
+
+        config.update(ConfigMsg::HookFocus("notify-send".into()));
+
+        assert_eq!(config.pomodoro.hook.focus, "notify-send");
+    }
+
+    #[test]
+    fn config_update_returns_none() {
+        let mut config = Config::default();
+        let cmds = config.update(ConfigMsg::TimerAutoFocus);
+
+        assert_eq!(cmds[0], ConfigCmd::None);
+    }
+
+    #[test]
+    fn section_from_item_index() {
+        assert_eq!(
+            SettingsSection::from_item_index(SettingsItem::TimerFocus.index()),
+            Some(SettingsSection::Timer)
+        );
+        assert_eq!(
+            SettingsSection::from_item_index(SettingsItem::HookShort.index()),
+            Some(SettingsSection::Hook)
+        );
+    }
+
+    #[test]
+    fn section_from_invalid_index() {
+        assert_eq!(SettingsSection::from_item_index(999), None);
+    }
+
+    #[test]
+    fn section_index_roundtrip() {
+        assert_eq!(
+            SettingsSection::from_index(SettingsSection::Timer.index()),
+            Some(SettingsSection::Timer)
+        );
     }
 }

@@ -367,3 +367,279 @@ impl From<Result<(), String>> for ConfigSaveResult {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+    use std::time::Duration;
+
+    use super::*;
+
+    struct MockEffects;
+    impl EffectHandler for MockEffects {
+        fn execute(&mut self, _cmd: Cmd) -> Vec<Msg> {
+            vec![]
+        }
+    }
+
+    fn test_config() -> Config {
+        Config::new(PathBuf::from("/tmp/test_tomo_config"))
+    }
+
+    fn test_pomodoro() -> Pomodoro {
+        Pomodoro::default()
+    }
+
+    #[test]
+    fn duplicate_on_launch() {
+        let core = AppCore::new(test_pomodoro(), test_config(), MockEffects, true);
+        assert_eq!(core.overlay(), Some(Overlay::DuplicateWarning));
+    }
+
+    #[test]
+    fn no_duplicate_no_overlay() {
+        let core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false);
+        assert_eq!(core.overlay(), None);
+    }
+
+    #[test]
+    fn tick_updates_active_session() {
+        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false);
+        core.update(Msg::SessionCreated { id: 42 });
+
+        let cmds = core.update(Msg::Tick);
+
+        assert!(
+            cmds.iter()
+                .any(|c| matches!(c, Cmd::UpdateSession { id: 42 }))
+        );
+    }
+
+    #[test]
+    fn tick_without_session() {
+        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false);
+        let cmds = core.update(Msg::Tick);
+
+        assert!(!cmds.iter().any(|c| matches!(c, Cmd::UpdateSession { .. })));
+    }
+
+    #[test]
+    fn quit_with_dirty_config_shows_warning() {
+        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false);
+        let _ = core.update(Msg::Config(ConfigMsg::TimerAutoFocus));
+
+        let cmds = core.update(Msg::Quit);
+
+        assert_eq!(core.overlay(), Some(Overlay::UnsavedWarning));
+        assert!(!core.is_quit());
+        assert!(!cmds.iter().any(|c| matches!(c, Cmd::Quit)));
+    }
+
+    #[test]
+    fn quit_with_clean_config_exits() {
+        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false);
+        let cmds = core.update(Msg::Quit);
+
+        assert!(core.is_quit());
+        assert!(cmds.iter().any(|c| matches!(c, Cmd::Quit)));
+        assert_eq!(core.overlay(), None);
+    }
+
+    #[test]
+    fn overlay_dismiss_messages() {
+        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false);
+
+        core.set_overlay(Some(Overlay::DuplicateWarning));
+        core.update(Msg::DuplicateWarningDismiss);
+        assert_eq!(core.overlay(), None);
+
+        core.set_overlay(Some(Overlay::UnsavedWarning));
+        core.update(Msg::UnsavedWarningCancel);
+        assert_eq!(core.overlay(), None);
+
+        core.set_overlay(Some(Overlay::ResetWarning));
+        core.update(Msg::ResetWarningCancel);
+        assert_eq!(core.overlay(), None);
+    }
+
+    #[test]
+    fn reset_warning_proceed() {
+        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false);
+        core.set_overlay(Some(Overlay::ResetWarning));
+
+        let _cmds = core.update(Msg::ResetWarningProceed);
+
+        assert_eq!(core.overlay(), None);
+    }
+
+    #[test]
+    fn reset_warning_show() {
+        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false);
+        assert_eq!(core.overlay(), None);
+
+        core.update(Msg::ResetWarningShow);
+        assert_eq!(core.overlay(), Some(Overlay::ResetWarning));
+    }
+
+    #[test]
+    fn unsaved_warning_save_and_quit() {
+        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false);
+        core.set_overlay(Some(Overlay::UnsavedWarning));
+
+        let cmds = core.update(Msg::UnsavedWarningSave);
+
+        assert_eq!(core.overlay(), None);
+        assert!(cmds.iter().any(|c| matches!(c, Cmd::SaveConfig(_))));
+        assert!(cmds.iter().any(|c| matches!(c, Cmd::Quit)));
+    }
+
+    #[test]
+    fn unsaved_warning_quit() {
+        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false);
+        core.set_overlay(Some(Overlay::UnsavedWarning));
+
+        core.update(Msg::UnsavedWarningQuit);
+        assert!(core.is_quit());
+    }
+
+    #[test]
+    fn duplicate_warning_quit() {
+        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false);
+        core.set_overlay(Some(Overlay::DuplicateWarning));
+
+        let cmds = core.update(Msg::DuplicateWarningQuit);
+        assert!(cmds.iter().any(|c| matches!(c, Cmd::Quit)));
+    }
+
+    #[test]
+    fn config_saved_ok() {
+        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false);
+        let _ = core.update(Msg::Config(ConfigMsg::TimerAutoFocus));
+        assert!(core.is_config_dirty());
+
+        let cmds = core.update(Msg::ConfigSaved(ConfigSaveResult::Ok));
+
+        assert!(!core.is_config_dirty());
+        assert!(cmds.iter().any(|c| matches!(
+            c,
+            Cmd::ShowToast {
+                kind: ToastType::Success,
+                ..
+            }
+        )));
+    }
+
+    #[test]
+    fn config_saved_err() {
+        let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false);
+        let _ = core.update(Msg::Config(ConfigMsg::TimerAutoFocus));
+        assert!(core.is_config_dirty());
+
+        let cmds = core.update(Msg::ConfigSaved(ConfigSaveResult::Err("disk full".into())));
+
+        assert!(core.is_config_dirty());
+        assert!(cmds.iter().any(|c| matches!(
+            c,
+            Cmd::ShowToast {
+                kind: ToastType::Error,
+                ..
+            }
+        )));
+    }
+
+    #[test]
+    fn session_end_emits_effects_and_prompt() {
+        let pomo = Pomodoro::new(
+            Duration::from_secs(0),
+            Duration::from_mins(10),
+            Duration::from_mins(5),
+            4,
+        );
+        let mut core = AppCore::new(pomo, test_config(), MockEffects, false);
+
+        core.update(Msg::Pomodoro(PomodoroMsg::Start));
+        core.update(Msg::SessionCreated { id: 1 });
+
+        let cmds = core.update(Msg::Pomodoro(PomodoroMsg::Tick));
+
+        assert!(cmds.iter().any(|c| matches!(c, Cmd::SendNotification(_))));
+        assert!(cmds.iter().any(|c| matches!(c, Cmd::PlaySound(_))));
+        assert!(cmds.iter().any(|c| matches!(c, Cmd::RunHook(_))));
+        assert!(cmds.iter().any(|c| matches!(c, Cmd::EndSession { id: 1 })));
+        assert_eq!(core.overlay(), Some(Overlay::PromptingTransition));
+    }
+
+    #[test]
+    fn session_end_auto_next() {
+        let pomo = Pomodoro::new(
+            Duration::from_secs(0),
+            Duration::from_mins(10),
+            Duration::from_mins(5),
+            4,
+        );
+        let mut config = test_config();
+        config.pomodoro.timer.auto_focus = true;
+
+        let mut core = AppCore::new(pomo, config, MockEffects, false);
+        core.update(Msg::Pomodoro(PomodoroMsg::Start));
+        core.update(Msg::SessionCreated { id: 1 });
+
+        let cmds = core.update(Msg::Pomodoro(PomodoroMsg::Tick));
+
+        assert!(cmds.iter().any(|c| matches!(c, Cmd::SendNotification(_))));
+        assert!(cmds.iter().any(|c| matches!(c, Cmd::PlaySound(_))));
+        assert!(cmds.iter().any(|c| matches!(c, Cmd::RunHook(_))));
+        assert_eq!(core.overlay(), None);
+        assert!(cmds.iter().any(|c| matches!(c, Cmd::NewSession { .. })));
+    }
+
+    #[test]
+    fn session_end_idempotent_effects() {
+        let pomo = Pomodoro::new(
+            Duration::from_secs(0),
+            Duration::from_mins(10),
+            Duration::from_mins(5),
+            4,
+        );
+        let mut core = AppCore::new(pomo, test_config(), MockEffects, false);
+
+        core.update(Msg::Pomodoro(PomodoroMsg::Start));
+        core.update(Msg::SessionCreated { id: 1 });
+
+        // First session end fires effects
+        core.update(Msg::Pomodoro(PomodoroMsg::Tick));
+        assert_eq!(core.overlay(), Some(Overlay::PromptingTransition));
+
+        // Another tick while prompting should not fire duplicate effects
+        core.update(Msg::SessionCreated { id: 2 });
+        let cmds = core.update(Msg::Pomodoro(PomodoroMsg::Tick));
+        assert!(!cmds.iter().any(|c| matches!(c, Cmd::SendNotification(_))));
+        assert!(!cmds.iter().any(|c| matches!(c, Cmd::PlaySound(_))));
+        assert!(!cmds.iter().any(|c| matches!(c, Cmd::RunHook(_))));
+    }
+
+    #[test]
+    fn from_mode_to_pomodoro_state() {
+        assert_eq!(PomodoroState::from(Mode::Focus), PomodoroState::Focus);
+        assert_eq!(
+            PomodoroState::from(Mode::LongBreak),
+            PomodoroState::LongBreak
+        );
+        assert_eq!(
+            PomodoroState::from(Mode::ShortBreak),
+            PomodoroState::ShortBreak
+        );
+    }
+
+    #[test]
+    fn config_save_result_from_ok() {
+        let r: ConfigSaveResult = Ok::<(), String>(()).into();
+        assert_eq!(r, ConfigSaveResult::Ok);
+    }
+
+    #[test]
+    fn config_save_result_from_err() {
+        let r: ConfigSaveResult = Result::<(), String>::Err("oops".into()).into();
+        assert_eq!(r, ConfigSaveResult::Err("oops".into()));
+    }
+}

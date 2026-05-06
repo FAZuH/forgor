@@ -63,4 +63,30 @@ mod tests {
         router.update(RouterMsg::GoTo(Page::Settings));
         assert_eq!(router.active_page(), Page::Settings);
     }
+
+    #[test]
+    fn from_page_to_msg() {
+        assert_eq!(RouterMsg::from(Page::Timer), RouterMsg::GoTo(Page::Timer));
+        assert_eq!(
+            RouterMsg::from(Page::Settings),
+            RouterMsg::GoTo(Page::Settings)
+        );
+    }
+
+    #[test]
+    fn update_stay_noop() {
+        let mut router = Router::new(Page::Timer);
+        let cmds = router.update(RouterMsg::Stay);
+
+        assert_eq!(router.active_page(), Page::Timer);
+        assert!(cmds.is_empty());
+    }
+
+    #[test]
+    fn update_go_to_returns_empty() {
+        let mut router = Router::new(Page::Timer);
+        let cmds = router.update(RouterMsg::GoTo(Page::Settings));
+
+        assert!(cmds.is_empty());
+    }
 }

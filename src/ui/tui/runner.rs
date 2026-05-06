@@ -448,3 +448,74 @@ impl Default for TickTimer {
         Self::new(Duration::from_secs(1))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tick_timer_new_tick_before_interval() {
+        let mut timer = TickTimer::new(Duration::from_secs(60));
+        assert!(!timer.new_tick());
+    }
+
+    #[test]
+    fn tick_timer_new_tick_after_interval() {
+        let mut timer = TickTimer::new(Duration::from_millis(10));
+        std::thread::sleep(Duration::from_millis(15));
+        assert!(timer.new_tick());
+    }
+
+    #[test]
+    fn tick_timer_consecutive_calls() {
+        let mut timer = TickTimer::new(Duration::from_millis(10));
+        std::thread::sleep(Duration::from_millis(15));
+        assert!(timer.new_tick());
+        assert!(!timer.new_tick());
+    }
+
+    #[test]
+    fn tick_timer_time_until_next_initial() {
+        let timer = TickTimer::new(Duration::from_secs(5));
+        let remaining = timer.time_until_next();
+
+        assert!(remaining <= Duration::from_secs(5));
+        assert!(remaining > Duration::from_secs(0));
+    }
+
+    #[test]
+    fn tick_timer_time_until_next_saturates() {
+        let timer = TickTimer::new(Duration::from_millis(10));
+        std::thread::sleep(Duration::from_millis(20));
+
+        // After the interval has passed, time_until_next should not underflow
+        let remaining = timer.time_until_next();
+        assert_eq!(remaining, Duration::ZERO);
+    }
+
+    #[test]
+    fn settings_item_into_config_msg_toggle() {
+        assert_eq!(
+            ConfigMsg::from(SettingsItem::AutoStartOnLaunch),
+            ConfigMsg::AutoStartOnLaunch
+        );
+        assert_eq!(
+            ConfigMsg::from(SettingsItem::TimerAutoFocus),
+            ConfigMsg::TimerAutoFocus
+        );
+        assert_eq!(
+            ConfigMsg::from(SettingsItem::TimerAutoShort),
+            ConfigMsg::TimerAutoShort
+        );
+        assert_eq!(
+            ConfigMsg::from(SettingsItem::TimerAutoLong),
+            ConfigMsg::TimerAutoLong
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "toggle_config_msg called on non-toggle item")]
+    fn settings_item_into_config_msg_non_toggle_panics() {
+        let _: ConfigMsg = SettingsItem::TimerFocus.into();
+    }
+}
