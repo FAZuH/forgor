@@ -7,6 +7,8 @@ pub trait TagRepo {}
 
 pub trait TaskRepo {
     fn add(&self, name: String) -> RepoResult<Task>;
+
+    fn find_by_name(&self, name: String) -> RepoResult<Task>;
 }
 
 pub trait SessionRepo {

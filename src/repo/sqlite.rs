@@ -3,10 +3,9 @@ use std::error::Error;
 
 use chrono::Local;
 use chrono::NaiveDateTime;
-use diesel::ExpressionMethods;
 use diesel::ExpressionMethods as _;
-use diesel::NullableExpressionMethods;
-use diesel::QueryDsl;
+use diesel::NullableExpressionMethods as _;
+use diesel::QueryDsl as _;
 use diesel::RunQueryDsl as _;
 use diesel::SelectableHelper as _;
 use diesel::SqliteConnection;
@@ -109,6 +108,17 @@ impl TaskRepo for SqliteTaskRepo {
         let task = diesel::insert_into(table)
             .values(name.eq(task_name))
             .returning(Task::as_returning())
+            .get_result(&mut self.pool.get()?)?;
+
+        Ok(task)
+    }
+
+    fn find_by_name(&self, task_name: String) -> RepoResult<Task> {
+        use crate::repo::schema::tasks::*;
+        let task = table
+            .filter(name.eq(task_name))
+            .limit(1)
+            .select(Task::as_select())
             .get_result(&mut self.pool.get()?)?;
 
         Ok(task)
