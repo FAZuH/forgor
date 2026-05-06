@@ -8,9 +8,11 @@ use ratatui::layout::Flex;
 use ratatui::prelude::*;
 use ratatui::symbols::border;
 use ratatui::widgets::Block;
+use ratatui::widgets::BorderType;
 use ratatui::widgets::Borders;
 use ratatui::widgets::Clear;
 use ratatui::widgets::Paragraph;
+use ratatui::widgets::Wrap;
 use strum::EnumCount;
 use tui_widgets::prompts::FocusState;
 use tui_widgets::prompts::State;
@@ -91,13 +93,12 @@ impl TuiSettingsView {
         let desc_block = Block::default()
             .title(" Description ")
             .borders(Borders::ALL)
-            .border_type(ratatui::widgets::BorderType::Rounded)
+            .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(Color::DarkGray));
 
         Paragraph::new(desc_text)
             .block(desc_block)
-            .wrap(ratatui::widgets::Wrap { trim: true })
-            .style(Style::default().fg(Color::Gray))
+            .wrap(Wrap { trim: true })
             .render(desc_area, buf);
 
         // Render help bar at bottom

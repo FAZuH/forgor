@@ -16,17 +16,10 @@ use crate::config::Percentage;
 use crate::config::PomodoroConfig;
 use crate::ui::prelude::*;
 
-#[derive(Clone, Debug, PartialEq, EnumDiscriminants, EnumCount, EnumMessage, FromRepr)]
-#[strum_discriminants(derive(
-    PartialOrd,
-    Ord,
-    FromRepr,
-    EnumCount,
-    EnumIter,
-    EnumMessage,
-    EnumProperty,
-    VariantArray,
-))]
+#[derive(
+    Clone, Debug, PartialEq, EnumDiscriminants, EnumCount, EnumMessage, FromRepr, EnumProperty,
+)]
+#[strum_discriminants(derive(PartialOrd, Ord, FromRepr, EnumCount, EnumIter, VariantArray,))]
 #[strum_discriminants(name(SettingsItem))]
 pub enum ConfigMsg {
     // Timer section
@@ -215,7 +208,7 @@ impl SettingsItem {
     }
 
     pub fn description(&self) -> &'static str {
-        self.get_str("description").unwrap_or("")
+        self.config_msg().get_str("description").unwrap_or("")
     }
 
     fn config_msg(&self) -> ConfigMsg {
@@ -345,4 +338,18 @@ pub enum ToastType {
     Error,
     Warning,
     Success,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn settings_item_props() {
+        assert_eq!(SettingsItem::TimerFocus.label(), "Focus");
+        assert_eq!(SettingsItem::TimerFocus.label_long(), "Focus Duration");
+        assert_eq!(
+            SettingsItem::TimerFocus.description(),
+            "Duration of the main focus session in minutes."
+        );
+    }
 }
