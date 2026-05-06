@@ -79,6 +79,9 @@ impl EffectHandler for TuiEffectHandler {
             Cmd::ShowToast { message, kind } => {
                 self.toast.show(message, kind);
             }
+            Cmd::Quit => {
+                let _ = self.sound.stop();
+            }
         }
         ret
     }

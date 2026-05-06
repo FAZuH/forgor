@@ -1,0 +1,54 @@
+flowchart TB
+    subgraph INPUT["Terminal Input"]
+        KEYS["Keyboard Events"]
+        TICK["1s Tick Timer"]
+    end
+
+    subgraph RUNNER["TuiRunner"]
+        POLL["poll & read events"]
+        ROUTE{"route by page & guard"}
+        REDRAW["render frame"]
+    end
+
+    subgraph VIEWS["Views (purely local state)"]
+        TIMER_V["TuiTimerView\nshow_keybinds"]
+        SETTINGS_V["TuiSettingsView\nscroll_state, selected, prompt"]
+    end
+
+    subgraph CORE["AppCore (single source of truth)"]
+        POMO["Pomodoro\n(timer logic)"]
+        CONF["Config\n(settings)"]
+        RTR["Router\n(active page)"]
+        SESS["Session tracking\n(active_session_id,\nis_prompting_transition)"]
+    end
+
+    subgraph FX["Effect Handler"]
+        SOUND["Play/Stop Sound"]
+        DB["DB (new/update/end session)"]
+        HOOK["Run Hook"]
+        NOTIFY["Desktop Notification"]
+        TOAST["Toast Message"]
+    end
+
+    KEYS --> POLL
+    TICK --> POLL
+    POLL --> ROUTE
+
+    ROUTE -- "TimerMsg\n(view-local)" --> TIMER_V
+    ROUTE -- "SettingsMsg\n(view-local)" --> SETTINGS_V
+    ROUTE -- "PomodoroMsg\n(business)" --> CORE
+    ROUTE -- "RouterMsg" --> CORE
+
+    TIMER_V -- "TimerCmd" --> CORE
+    SETTINGS_V -- "SettingsCmd" --> CORE
+
+    CORE -- "Cmd (effects)" --> FX
+    FX -- "Msg (results)" --> CORE
+
+    CORE -- "ViewTimerCmd / ViewSettingsCmd\n(raw dispatch)" --> CORE
+
+    CORE -. "&Pomodoro, is_prompting_transition\n(read at render time)" .-> TIMER_V
+    CORE -. "&Config, is_config_dirty\n(read at render time)" .-> SETTINGS_V
+
+    TIMER_V --> REDRAW
+    SETTINGS_V --> REDRAW

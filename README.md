@@ -111,21 +111,28 @@ tomo -f 45m -s 5m -l 15m -L 3
 ```yaml
 pomodoro:
   timer:
-    focus: 1500          # 25 minutes in seconds
-    short: 300           # 5 minutes in seconds
-    long: 900            # 15 minutes in seconds
-    long_interval: 3     # Long break after 3 focus sessions
-    auto_focus: false    # Auto-start focus sessions
-    auto_short: false    # Auto-start short breaks
-    auto_long: false     # Auto-start long breaks
+    focus: 1500                 # 25 minutes in seconds
+    short: 300                  # 5 minutes in seconds
+    long: 900                   # 15 minutes in seconds
+    long_interval: 3            # Long break after 3 focus sessions
+    auto_start_on_launch: false # Start automatically on launch
+    auto_focus: false           # Auto-start focus sessions
+    auto_short: false           # Auto-start short breaks
+    auto_long: false            # Auto-start long breaks
   hook:
-    focus: ""            # Command to run on focus start
-    short: ""            # Command to run on short break start
-    long: ""             # Command to run on long break start
-  sound:
-    focus: null          # Path to focus start sound
-    short: null          # Path to short break start sound
-    long: null           # Path to long break start sound
+    focus: ""                   # Command to run on focus start
+    short: ""                   # Command to run on short break start
+    long: ""                    # Command to run on long break start
+  alarm:
+    focus:
+      path: null                # Path to focus start sound
+      volume: 100               # Volume percentage (0-100)
+    short:
+      path: null                # Path to short break start sound
+      volume: 100               # Volume percentage (0-100)
+    long:
+      path: null                # Path to long break start sound
+      volume: 100               # Volume percentage (0-100)
 ```
 
 ## Keybindings
@@ -135,22 +142,29 @@ pomodoro:
 | Key | Action |
 |-----|--------|
 | `Space` | Toggle pause/resume |
-| `↑` / `Up` / `k` | Add 1 minute |
-| `↓` / `Down` / `j` | Subtract 1 minute |
-| `→` / `Right` / `l` | Add 30 seconds |
-| `←` / `Left` / `h` | Subtract 30 seconds |
+| `↑` / `↓` / `k` / `j` | Add / subtract 1 minute |
+| `←` / `→` / `h` / `l` | Add / subtract 30 seconds |
 | `Enter` | Skip to next session |
 | `Backspace` | Reset current session |
+| `m` | Stop alarm sound |
+| `s` | Open settings |
+| `?` | Toggle keybinds help |
 | `q` | Quit |
 
 ### Settings View
 
 | Key | Action |
 |-----|--------|
-| `↑` / `k` | Move selection up |
-| `↓` / `j` | Move selection down |
-| `Enter` | Edit selected setting |
+| `↑` / `↓` / `k` / `j` | Move selection up / down |
+| `Tab` / `Shift+Tab` | Next / previous section |
+| `1` / `2` / `3` | Jump to section |
+| `Enter` / `Space` | Edit selected setting / toggle |
+| `s` | Save settings |
+| `c` / `y` | Copy selected value |
+| `v` / `p` | Paste copied value |
 | `Esc` | Back to timer |
+| `?` | Toggle keybinds help |
+| `m` | Stop alarm sound |
 | `q` | Quit |
 
 ## Credit where credit is due
