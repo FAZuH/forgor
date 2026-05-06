@@ -1,5 +1,6 @@
 pub mod config;
 pub mod pomo;
+mod translate;
 
 pub use config::ConfigCmd;
 pub use config::ConfigMsg;

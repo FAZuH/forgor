@@ -90,15 +90,26 @@ pub struct AppCore<E: EffectHandler> {
 
     active_session_id: Option<i32>,
     config_snapshot: Config,
-    is_prompting_transition: bool,
-    show_duplicate_warning: bool,
-    show_unsaved_warning: bool,
-    show_reset_warning: bool,
+    overlay: Option<Overlay>,
     is_quit: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Overlay {
+    PromptingTransition,
+    DuplicateWarning,
+    UnsavedWarning,
+    ResetWarning,
 }
 
 impl<E: EffectHandler> AppCore<E> {
     pub fn new(pomodoro: Pomodoro, config: Config, effects: E, is_duplicate: bool) -> Self {
+        let overlay = if is_duplicate {
+            Some(Overlay::DuplicateWarning)
+        } else {
+            None
+        };
+
         Self {
             effects,
             pomodoro,
@@ -107,10 +118,7 @@ impl<E: EffectHandler> AppCore<E> {
             config,
 
             active_session_id: None,
-            is_prompting_transition: false,
-            show_duplicate_warning: is_duplicate,
-            show_unsaved_warning: false,
-            show_reset_warning: false,
+            overlay,
             is_quit: false,
         }
     }
@@ -156,28 +164,24 @@ impl<E: EffectHandler> AppCore<E> {
         &mut self.effects
     }
 
-    pub fn is_prompting_transition(&self) -> bool {
-        self.is_prompting_transition
-    }
-
     pub fn is_config_dirty(&self) -> bool {
         self.config != self.config_snapshot
     }
 
-    pub fn show_duplicate_warning(&self) -> bool {
-        self.show_duplicate_warning
+    pub fn overlay(&self) -> Option<Overlay> {
+        self.overlay
     }
 
-    pub fn show_unsaved_warning(&self) -> bool {
-        self.show_unsaved_warning
-    }
-
-    pub fn show_reset_warning(&self) -> bool {
-        self.show_reset_warning
+    pub fn set_overlay(&mut self, overlay: Option<Overlay>) {
+        self.overlay = overlay;
     }
 
     pub fn is_quit(&self) -> bool {
         self.is_quit
+    }
+
+    pub(crate) fn update_config_snapshot(&mut self) {
+        self.config_snapshot = self.config.clone();
     }
 }
 
@@ -209,23 +213,23 @@ impl<E: EffectHandler> Updateable<Msg, Cmd> for AppCore<E> {
             Msg::SessionsClosed => {}
             Msg::ConfigSaved(result) => ret.extend(self.handle_config_saved(result)),
             Msg::NotificationSent(_) => {}
-            Msg::DuplicateWarningDismiss => self.show_duplicate_warning = false,
+            Msg::DuplicateWarningDismiss => self.overlay = None,
             Msg::DuplicateWarningQuit => ret.extend(self.update(Msg::Quit)),
             Msg::UnsavedWarningSave => {
                 ret.extend(self.update(Msg::ViewSettingsCmd(SettingsCmd::SaveConfig)));
                 ret.extend(self.update(Msg::Quit));
-                self.show_unsaved_warning = false
+                self.overlay = None;
             }
             Msg::UnsavedWarningQuit => ret.extend(self.update(Msg::ForceQuit)),
-            Msg::UnsavedWarningCancel => self.show_unsaved_warning = false,
+            Msg::UnsavedWarningCancel => self.overlay = None,
             Msg::Quit => ret.extend(self.handle_quit()),
             Msg::ForceQuit => self.is_quit = true,
             Msg::ResetWarningProceed => {
                 ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::ResetSession)));
-                self.show_reset_warning = false;
+                self.overlay = None;
             }
-            Msg::ResetWarningCancel => self.show_reset_warning = false,
-            Msg::ResetWarningShow => self.show_reset_warning = true,
+            Msg::ResetWarningCancel => self.overlay = None,
+            Msg::ResetWarningShow => self.overlay = Some(Overlay::ResetWarning),
         }
         ret
     }
@@ -235,7 +239,7 @@ impl<E: EffectHandler> AppCore<E> {
     fn handle_quit(&mut self) -> Vec<Cmd> {
         let mut ret = vec![];
         if self.is_config_dirty() {
-            self.show_unsaved_warning = true;
+            self.overlay = Some(Overlay::UnsavedWarning);
         } else {
             self.is_quit = true;
             ret.push(Cmd::Quit);
@@ -272,7 +276,11 @@ impl<E: EffectHandler> AppCore<E> {
         }
     }
 
-    fn handle_session_end(&mut self, curr_mode: Mode, next_mode: Mode) -> Vec<Cmd> {
+    pub(crate) fn take_active_session_id(&mut self) -> Option<i32> {
+        self.active_session_id.take()
+    }
+
+    pub(crate) fn handle_session_end(&mut self, curr_mode: Mode, next_mode: Mode) -> Vec<Cmd> {
         let mut ret = Vec::new();
 
         // End the active session (.take() so only fires once).
@@ -284,7 +292,7 @@ impl<E: EffectHandler> AppCore<E> {
         // Skipped if already prompting (effects already fired on first SessionEnd).
         let config = &self.config_snapshot;
         let auto_next = self.should_auto_next(&curr_mode, &config.pomodoro.timer);
-        let should_fire = auto_next || !self.is_prompting_transition;
+        let should_fire = auto_next || self.overlay != Some(Overlay::PromptingTransition);
 
         if should_fire {
             let alarm = self.alarm_for(&next_mode, &config.pomodoro.alarm).clone();
@@ -299,7 +307,7 @@ impl<E: EffectHandler> AppCore<E> {
             // Advance to the next mode and start a fresh session.
             ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::NextSession)));
         } else {
-            self.is_prompting_transition = true;
+            self.overlay = Some(Overlay::PromptingTransition);
         }
 
         ret
@@ -327,107 +335,6 @@ impl<E: EffectHandler> AppCore<E> {
             Mode::LongBreak => &hook.long,
             Mode::ShortBreak => &hook.short,
         }
-    }
-}
-
-impl<E: EffectHandler> AppCore<E> {
-    fn translate_pomodoro_cmd(&mut self, cmd: PomodoroCmd) -> Vec<Cmd> {
-        let mut ret = Vec::new();
-        match cmd {
-            PomodoroCmd::Started(mode) => {
-                ret.push(Cmd::NewSession {
-                    task_id: None,
-                    state: mode.into(),
-                });
-            }
-            PomodoroCmd::StartedPaused => {}
-            PomodoroCmd::SessionEnd {
-                curr_mode,
-                next_mode,
-            } => {
-                ret.extend(self.handle_session_end(curr_mode, next_mode));
-            }
-            PomodoroCmd::NextSession(mode) => {
-                ret.push(Cmd::NewSession {
-                    task_id: None,
-                    state: mode.into(),
-                });
-            }
-            PomodoroCmd::SessionPaused => {
-                if let Some(id) = self.active_session_id.take() {
-                    ret.push(Cmd::EndSession { id });
-                }
-            }
-            PomodoroCmd::SessionResumed(mode) => {
-                ret.push(Cmd::NewSession {
-                    task_id: None,
-                    state: mode.into(),
-                });
-            }
-            PomodoroCmd::SessionSkipped(mode) => {
-                if let Some(id) = self.active_session_id.take() {
-                    ret.push(Cmd::EndSession { id });
-                }
-                ret.push(Cmd::NewSession {
-                    task_id: None,
-                    state: mode.into(),
-                });
-            }
-        }
-        ret
-    }
-
-    fn translate_config_cmd(&mut self, cmd: ConfigCmd) -> Vec<Cmd> {
-        let ret = vec![];
-        match cmd {
-            ConfigCmd::None => {}
-        }
-        ret
-    }
-
-    fn translate_router_cmd(&mut self, cmd: RouterCmd) -> Vec<Cmd> {
-        let ret = vec![];
-        match cmd {
-            RouterCmd::None => {}
-        }
-        ret
-    }
-
-    fn translate_timer_cmd(&mut self, cmd: TimerCmd) -> Vec<Cmd> {
-        let mut ret = vec![Cmd::StopSound];
-
-        match cmd {
-            TimerCmd::PromptTransitionAnsweredYes => {
-                ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::NextSession)))
-            }
-            TimerCmd::PromptTransitionAnsweredNo => {
-                ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::NextSession)));
-                ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::Pause)))
-            }
-        };
-        self.is_prompting_transition = false;
-
-        ret
-    }
-
-    fn translate_settings_cmd(&mut self, cmd: SettingsCmd) -> Vec<Cmd> {
-        let mut ret = vec![];
-        match cmd {
-            SettingsCmd::SaveEdit(msg) => {
-                ret.extend(self.update(Msg::Config(msg)));
-            }
-            SettingsCmd::SaveConfig => {
-                ret.push(Cmd::SaveConfig(Box::new(self.config.clone())));
-                self.config_snapshot = self.config.clone();
-            }
-            SettingsCmd::ShowToast { message, r#type } => {
-                ret.push(Cmd::ShowToast {
-                    message,
-                    kind: r#type,
-                });
-            }
-        }
-        ret
     }
 }
 

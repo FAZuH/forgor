@@ -26,45 +26,69 @@ pub enum ConfigMsg {
     #[strum(
         message = "Focus",
         detailed_message = "Focus Duration",
-        props(description = "Duration of the main focus session in minutes.")
+        props(
+            description = "Duration of the main focus session in minutes.",
+            type = "duration"
+        )
     )]
     TimerFocus(Duration),
     #[strum(
         message = "Short Break",
         detailed_message = "Short Break Duration",
-        props(description = "Duration of a short break in minutes.")
+        props(
+            description = "Duration of a short break in minutes.",
+            type = "duration"
+        )
     )]
     TimerShort(Duration),
     #[strum(
         message = "Long Break",
         detailed_message = "Long Break Duration",
-        props(description = "Duration of a long break in minutes.")
+        props(
+            description = "Duration of a long break in minutes.",
+            type = "duration"
+        )
     )]
     TimerLong(Duration),
     #[strum(
         message = "Long Break Interval",
         detailed_message = "Long Break Interval",
-        props(description = "Number of focus sessions before a long break.")
+        props(
+            description = "Number of focus sessions before a long break.",
+            type = "number"
+        )
     )]
     TimerLongInterval(u32),
     #[strum(
         message = "Auto-start on Launch",
-        props(description = "Automatically start the timer when the application launches.")
+        props(
+            description = "Automatically start the timer when the application launches.",
+            type = "toggle"
+        )
     )]
     AutoStartOnLaunch,
     #[strum(
         message = "Focus",
-        props(description = "Automatically start the next focus session after a break.")
+        props(
+            description = "Automatically start the next focus session after a break.",
+            type = "toggle"
+        )
     )]
     TimerAutoFocus,
     #[strum(
         message = "Short Break",
-        props(description = "Automatically start a short break after a focus session.")
+        props(
+            description = "Automatically start a short break after a focus session.",
+            type = "toggle"
+        )
     )]
     TimerAutoShort,
     #[strum(
         message = "Long Break",
-        props(description = "Automatically start a long break when the interval is reached.")
+        props(
+            description = "Automatically start a long break when the interval is reached.",
+            type = "toggle"
+        )
     )]
     TimerAutoLong,
 
@@ -72,19 +96,28 @@ pub enum ConfigMsg {
     #[strum(
         message = "Focus",
         detailed_message = "Focus Hook Command",
-        props(description = "Shell command to execute when a focus session starts.")
+        props(
+            description = "Shell command to execute when a focus session starts.",
+            type = "string"
+        )
     )]
     HookFocus(String),
     #[strum(
         message = "Short Break",
         detailed_message = "Short Break Hook Command",
-        props(description = "Shell command to execute when a short break starts.")
+        props(
+            description = "Shell command to execute when a short break starts.",
+            type = "string"
+        )
     )]
     HookShort(String),
     #[strum(
         message = "Long Break",
         detailed_message = "Long Break Hook Command",
-        props(description = "Shell command to execute when a long break starts.")
+        props(
+            description = "Shell command to execute when a long break starts.",
+            type = "string"
+        )
     )]
     HookLong(String),
 
@@ -92,37 +125,55 @@ pub enum ConfigMsg {
     #[strum(
         message = "Focus",
         detailed_message = "Focus Alarm Sound File Path",
-        props(description = "Path to the audio file played when a focus session ends.")
+        props(
+            description = "Path to the audio file played when a focus session ends.",
+            type = "path"
+        )
     )]
     AlarmPathFocus(Option<PathBuf>),
     #[strum(
         message = "Short Break",
         detailed_message = "Short Break Alarm Sound File Path",
-        props(description = "Path to the audio file played when a short break ends.")
+        props(
+            description = "Path to the audio file played when a short break ends.",
+            type = "path"
+        )
     )]
     AlarmPathShort(Option<PathBuf>),
     #[strum(
         message = "Long Break",
         detailed_message = "Long Break Alarm Sound File Path",
-        props(description = "Path to the audio file played when a long break ends.")
+        props(
+            description = "Path to the audio file played when a long break ends.",
+            type = "path"
+        )
     )]
     AlarmPathLong(Option<PathBuf>),
     #[strum(
         message = "Focus",
         detailed_message = "Focus Alarm Volume",
-        props(description = "Volume level (0-100) for the focus alarm.")
+        props(
+            description = "Volume level (0-100) for the focus alarm.",
+            type = "percentage"
+        )
     )]
     AlarmVolumeFocus(Percentage),
     #[strum(
         message = "Short Break",
         detailed_message = "Short Break Alarm Volume",
-        props(description = "Volume level (0-100) for the short break alarm.")
+        props(
+            description = "Volume level (0-100) for the short break alarm.",
+            type = "percentage"
+        )
     )]
     AlarmVolumeShort(Percentage),
     #[strum(
         message = "Long Break",
         detailed_message = "Long Break Alarm Volume",
-        props(description = "Volume level (0-100) for the long break alarm.")
+        props(
+            description = "Volume level (0-100) for the long break alarm.",
+            type = "percentage"
+        )
     )]
     AlarmVolumeLong(Percentage),
 }
@@ -223,35 +274,15 @@ impl SettingsItem {
     }
 
     pub fn is_toggle(&self) -> bool {
-        Self::toggles().contains(self)
+        self.config_msg().get_str("type") == Some("toggle")
     }
 
     pub fn is_percentage(&self) -> bool {
-        Self::percentages().contains(self)
+        self.config_msg().get_str("type") == Some("percentage")
     }
 
     pub fn is_path(&self) -> bool {
-        self.paths().contains(self)
-    }
-
-    pub fn paths(&self) -> Vec<Self> {
-        use SettingsItem::*;
-        vec![AlarmPathFocus, AlarmPathLong, AlarmPathShort]
-    }
-
-    fn toggles() -> Vec<Self> {
-        use SettingsItem::*;
-        vec![
-            TimerAutoFocus,
-            TimerAutoShort,
-            TimerAutoLong,
-            AutoStartOnLaunch,
-        ]
-    }
-
-    fn percentages() -> Vec<Self> {
-        use SettingsItem::*;
-        vec![AlarmVolumeFocus, AlarmVolumeLong, AlarmVolumeShort]
+        self.config_msg().get_str("type") == Some("path")
     }
 }
 
@@ -343,12 +374,17 @@ pub enum ToastType {
 mod tests {
     use super::*;
     #[test]
-    fn settings_item_props() {
+    fn item_props() {
         assert_eq!(SettingsItem::TimerFocus.label(), "Focus");
         assert_eq!(SettingsItem::TimerFocus.label_long(), "Focus Duration");
         assert_eq!(
             SettingsItem::TimerFocus.description(),
             "Duration of the main focus session in minutes."
         );
+    }
+
+    #[test]
+    fn item_toggle() {
+        assert!(SettingsItem::AutoStartOnLaunch.is_toggle());
     }
 }
