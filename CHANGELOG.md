@@ -1,3 +1,25 @@
+## 0.2.5 (2026-05-06)
+
+
+### Bug Fixes
+
+* Transition prompt not disappearing after submitting ([65b7597](https://github.com/FAZuH/tomo/commit/65b75979bf49b93d04fd8ea4249820788bcc1bc1))
+
+
+### New Features
+
+* Add warning when trying to start the program when another ([ca981c1](https://github.com/FAZuH/tomo/commit/ca981c1094b1d97b608d46d7364a1879e1839b83)), closes [#40](https://github.com/FAZuH/tomo/issues/40)
+
+
+### UI Changes
+
+* Add settings item descriptions ([2be2907](https://github.com/FAZuH/tomo/commit/2be2907844c307484c16bbf07f6efe4f76056620)), closes [#35](https://github.com/FAZuH/tomo/issues/35)
+
+
+### Performance Improvements
+
+* Redraw frame on resize ([50f035d](https://github.com/FAZuH/tomo/commit/50f035ddb50ff55b737f86411643647c26d98c86)), closes [#36](https://github.com/FAZuH/tomo/issues/36)
+
 ## 0.2.4 (2026-05-05)
 
 
@@ -54,28 +76,4 @@
 * Fix tick timer bug causing high CPU usage ([d36489e](https://github.com/FAZuH/tomo/commit/d36489e37b93fd0b43ff85dd1143152cb3d5721a))
 * Improve idle CPU usage ([f74a09f](https://github.com/FAZuH/tomo/commit/f74a09f6a99d6896b060d000572e8e9b84454c46))
 * Redraw only when a valid input is pressed ([50c0e1d](https://github.com/FAZuH/tomo/commit/50c0e1ddc46f8e67129886b3298c6151ced8b3da))
-
-## 0.2.0 (2026-05-01)
-
-
-### Bug Fixes
-
-* Alarm volume settings showing alarm path when editing ([1a389a9](https://github.com/FAZuH/tomo/commit/1a389a914127bc3cb32a387ae67c4148428d1363))
-* Crash when toast exceeds frame height ([1de1a29](https://github.com/FAZuH/tomo/commit/1de1a2942819df43eb8e4cbc9d753786a333dc40))
-* Fix toast deduplication issues ([8c098d2](https://github.com/FAZuH/tomo/commit/8c098d2e53ca6ded0257bb8f42301e7f445da3df))
-
-
-### New Features
-
-* Add settings page keybind help ([8db8c50](https://github.com/FAZuH/tomo/commit/8db8c501ad92318257e2465e151a70a6902b585b))
-* Add settings section navigation and improve UI ([f628c27](https://github.com/FAZuH/tomo/commit/f628c271fd20d0cbd0adb65dc27fcfb280499a6a))
-* Add settings section select buttons ([3124353](https://github.com/FAZuH/tomo/commit/312435375e4b7db62bbef1c89a294c874f6005c2))
-* Add toast deduplication ([eaab8f0](https://github.com/FAZuH/tomo/commit/eaab8f0da4fe7371675d8b71d847a1bc594b823d))
-* Adjust padding of settings ([33fd694](https://github.com/FAZuH/tomo/commit/33fd69471d68587fd100028cd9c83cbbbac384e8))
-* Improve settings layout ([4024c54](https://github.com/FAZuH/tomo/commit/4024c544edb3b11bc822eb90e2fd42ff9ddf8ae4))
-* Improve timer page keybind hint ([8ffca11](https://github.com/FAZuH/tomo/commit/8ffca117a355b311921ca9aa06a856b12eb7b34c))
-* Invert timer 30sec offset keybinds ([d586abd](https://github.com/FAZuH/tomo/commit/d586abd445ebd8d8dbc318bee4872760e7da8750))
-* Make settings checkbox label dim ([08f8dcd](https://github.com/FAZuH/tomo/commit/08f8dcdf3b65a07c54b889f2e6bee24b33b1aa92))
-* Make timer shortcut toggleable ([8900478](https://github.com/FAZuH/tomo/commit/8900478530b941b3d986099d914814c3bd5784b4))
-* Trim percent when editing alarm volume ([83a47ec](https://github.com/FAZuH/tomo/commit/83a47ecee1437bec36c7bad6229306bd8a636bb0))
 
