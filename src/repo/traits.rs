@@ -1,4 +1,6 @@
-use crate::repo::model::*;
+use crate::model::Mode;
+use crate::model::Session;
+use crate::model::Task;
 
 type RepoResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 pub trait ProjectRepo {}
@@ -6,13 +8,13 @@ pub trait ProjectRepo {}
 pub trait TagRepo {}
 
 pub trait TaskRepo {
-    fn add(&self, name: String, description: Option<String>) -> RepoResult<TaskRow>;
+    fn add(&self, name: String, description: Option<String>) -> RepoResult<Task>;
 
-    fn find_by_name(&self, name: String) -> RepoResult<TaskRow>;
+    fn find_by_name(&self, name: String) -> RepoResult<Task>;
 }
 
 pub trait SessionRepo {
-    fn new_session(&self, task_id: Option<i32>, state: PomodoroState) -> RepoResult<SessionRow>;
+    fn new_session(&self, task_id: Option<i32>, mode: Mode) -> RepoResult<Session>;
 
     fn update(&self, id: i32) -> RepoResult<usize>;
 

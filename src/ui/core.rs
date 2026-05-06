@@ -5,7 +5,6 @@ use crate::config::Hooks;
 use crate::config::Timers;
 use crate::model::Mode;
 use crate::model::Pomodoro;
-use crate::repo::model::PomodoroState;
 use crate::ui::prelude::*;
 
 // type IPomodoro = Box<dyn Updateable<PomodoroMsg, PomodoroCmd>>;
@@ -65,7 +64,7 @@ pub enum Cmd {
     // Database
     NewSession {
         task_id: Option<i32>,
-        state: PomodoroState,
+        mode: Mode,
     },
     UpdateSession {
         id: i32,
@@ -349,39 +348,6 @@ impl<E: EffectHandler> AppCore<E> {
         }
     }
 }
-
-impl From<Mode> for PomodoroState {
-    fn from(value: Mode) -> Self {
-        match value {
-            Mode::Focus => Self::Focus,
-            Mode::LongBreak => Self::LongBreak,
-            Mode::ShortBreak => Self::ShortBreak,
-        }
-    }
-}
-
-/// Outcome of a config-save effect so that AppCore can update its dirty flag.
-#[derive(Debug, Clone, PartialEq)]
-pub enum ConfigSaveResult {
-    Ok,
-    Err(String),
-}
-
-impl From<Result<(), String>> for ConfigSaveResult {
-    fn from(r: Result<(), String>) -> Self {
-        match r {
-            Ok(()) => ConfigSaveResult::Ok,
-            Err(e) => ConfigSaveResult::Err(e),
-        }
-    }
-}
-
-// ---------------------------------------------------------
-//   ___ __  __ ___    _____ ___    _   _  _ ___ _      _ _____ ___ ___  _  _
-//  / __|  \/  |   \  |_   _| _ \  /_\ | \| / __| |    /_\_   _|_ _/ _ \| \| |
-// | (__| |\/| | |) |   | | |   / / _ \| .` \__ \ |__ / _ \| |  | | (_) | .` |
-//  \___|_|  |_|___/    |_| |_|_\/_/ \_\_|\_|___/____/_/ \_\_| |___\___/|_|\_|
-// ---------------------------------------------------------
 
 impl<E: EffectHandler> AppCore<E> {
     pub fn translate_pomodoro_cmd(&mut self, cmd: PomodoroCmd) -> Vec<Cmd> {

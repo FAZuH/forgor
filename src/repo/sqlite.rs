@@ -13,6 +13,9 @@ use diesel::r2d2::ConnectionManager;
 use diesel::r2d2::Pool;
 use diesel_migrations::MigrationHarness as _;
 
+use crate::model::Mode;
+use crate::model::Session;
+use crate::model::Task;
 use crate::repo::MIGRATIONS;
 use crate::repo::ProjectRepo;
 use crate::repo::Repos;
@@ -103,25 +106,25 @@ impl SqliteTaskRepo {
 }
 
 impl TaskRepo for SqliteTaskRepo {
-    fn add(&self, task_name: String, desc: Option<String>) -> RepoResult<TaskRow> {
+    fn add(&self, task_name: String, desc: Option<String>) -> RepoResult<Task> {
         use crate::repo::schema::tasks::*;
-        let task = diesel::insert_into(table)
+        let row = diesel::insert_into(table)
             .values((name.eq(task_name), description.eq(desc)))
             .returning(TaskRow::as_returning())
             .get_result(&mut self.pool.get()?)?;
 
-        Ok(task)
+        Ok(row.into())
     }
 
-    fn find_by_name(&self, task_name: String) -> RepoResult<TaskRow> {
+    fn find_by_name(&self, task_name: String) -> RepoResult<Task> {
         use crate::repo::schema::tasks::*;
-        let task = table
+        let row = table
             .filter(name.eq(task_name))
             .limit(1)
             .select(TaskRow::as_select())
             .get_result(&mut self.pool.get()?)?;
 
-        Ok(task)
+        Ok(row.into())
     }
 }
 
@@ -131,20 +134,20 @@ pub struct SqliteSessionRepo {
 }
 
 impl SessionRepo for SqliteSessionRepo {
-    fn new_session(&self, task_id: Option<i32>, state: PomodoroState) -> RepoResult<SessionRow> {
+    fn new_session(&self, task_id: Option<i32>, mode: Mode) -> RepoResult<Session> {
         use crate::repo::schema::sessions as s;
         let now = now();
-        let ret = diesel::insert_into(s::table)
+        let row = diesel::insert_into(s::table)
             .values((
                 s::task_id.eq(task_id),
                 s::start_at.eq(now),
                 s::updated_at.eq(now),
-                s::pomodoro_state.eq(state),
+                s::pomodoro_state.eq(PomodoroState::from(mode)),
             ))
             .returning(SessionRow::as_returning())
             .get_result(&mut self.pool.get()?)?;
 
-        Ok(ret)
+        Ok(row.into())
     }
 
     fn update(&self, id: i32) -> RepoResult<usize> {

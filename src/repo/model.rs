@@ -134,3 +134,76 @@ where
         }
     }
 }
+
+use crate::model::Mode;
+use crate::model::Project;
+use crate::model::Session;
+use crate::model::Tag;
+use crate::model::Task;
+
+impl From<TaskRow> for Task {
+    fn from(row: TaskRow) -> Self {
+        Self {
+            id: row.id,
+            name: row.name,
+            description: row.description,
+            deadline: row.deadline,
+            parent_id: row.parent_id,
+            project_id: row.project_id,
+        }
+    }
+}
+
+impl From<SessionRow> for Session {
+    fn from(row: SessionRow) -> Self {
+        Self {
+            id: row.id,
+            task_id: row.task_id,
+            start_at: row.start_at,
+            updated_at: row.updated_at,
+            end_at: row.end_at,
+            mode: Mode::from(row.pomodoro_state),
+            paused: row.paused,
+        }
+    }
+}
+
+impl From<ProjectRow> for Project {
+    fn from(row: ProjectRow) -> Self {
+        Self {
+            id: row.id,
+            name: row.name,
+            description: row.description,
+        }
+    }
+}
+
+impl From<TagRow> for Tag {
+    fn from(row: TagRow) -> Self {
+        Self {
+            id: row.id,
+            name: row.name,
+            description: row.description,
+        }
+    }
+}
+
+impl From<PomodoroState> for Mode {
+    fn from(value: PomodoroState) -> Self {
+        match value {
+            PomodoroState::Focus => Self::Focus,
+            PomodoroState::LongBreak => Self::LongBreak,
+            PomodoroState::ShortBreak => Self::ShortBreak,
+        }
+    }
+}
+
+impl From<Mode> for PomodoroState {
+    fn from(value: Mode) -> Self {
+        match value {
+            Mode::Focus => Self::Focus,
+            Mode::LongBreak => Self::LongBreak,
+            Mode::ShortBreak => Self::ShortBreak,
+        }
+    }
+}
