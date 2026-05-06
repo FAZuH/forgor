@@ -349,9 +349,11 @@ impl<E: EffectHandler> AppCore<E> {
                 ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::NextSession)))
             }
             TimerCmd::PromptTransitionAnsweredNo => {
+                ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::NextSession)));
                 ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::Pause)))
             }
         };
+        self.is_prompting_transition = false;
 
         ret
     }
