@@ -18,6 +18,8 @@ pub enum Msg {
     Router(RouterMsg),
 
     // System messages.
+    Quit,
+    ForceQuit,
     /// Emitted by the Runner every 1 second.
     Tick,
 
@@ -38,10 +40,21 @@ pub enum Msg {
     // Duplicate instance warning
     DuplicateWarningDismiss,
     DuplicateWarningQuit,
+
+    // Unsaved changes warning
+    UnsavedWarningSave,
+    UnsavedWarningCancel,
+    UnsavedWarningQuit,
+
+    // Timer reset warning
+    ResetWarningShow,
+    ResetWarningProceed,
+    ResetWarningCancel,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Cmd {
+    Quit,
     // Sound
     PlaySound(Alarm),
     StopSound,
@@ -67,7 +80,6 @@ pub enum Cmd {
     // Persistence
     SaveConfig(Box<Config>), // Box, because Config is large.
     RunHook(String),
-    // Views
 }
 
 pub struct AppCore<E: EffectHandler> {
@@ -79,18 +91,27 @@ pub struct AppCore<E: EffectHandler> {
     active_session_id: Option<i32>,
     config_snapshot: Config,
     is_prompting_transition: bool,
+    show_duplicate_warning: bool,
+    show_unsaved_warning: bool,
+    show_reset_warning: bool,
+    is_quit: bool,
 }
 
 impl<E: EffectHandler> AppCore<E> {
-    pub fn new(pomodoro: Pomodoro, config: Config, effects: E) -> Self {
+    pub fn new(pomodoro: Pomodoro, config: Config, effects: E, is_duplicate: bool) -> Self {
         Self {
             effects,
             pomodoro,
             router: Router::new(Page::Timer),
             config_snapshot: config.clone(),
             config,
+
             active_session_id: None,
             is_prompting_transition: false,
+            show_duplicate_warning: is_duplicate,
+            show_unsaved_warning: false,
+            show_reset_warning: false,
+            is_quit: false,
         }
     }
 
@@ -142,6 +163,22 @@ impl<E: EffectHandler> AppCore<E> {
     pub fn is_config_dirty(&self) -> bool {
         self.config != self.config_snapshot
     }
+
+    pub fn show_duplicate_warning(&self) -> bool {
+        self.show_duplicate_warning
+    }
+
+    pub fn show_unsaved_warning(&self) -> bool {
+        self.show_unsaved_warning
+    }
+
+    pub fn show_reset_warning(&self) -> bool {
+        self.show_reset_warning
+    }
+
+    pub fn is_quit(&self) -> bool {
+        self.is_quit
+    }
 }
 
 impl<E: EffectHandler> Updateable<Msg, Cmd> for AppCore<E> {
@@ -172,25 +209,40 @@ impl<E: EffectHandler> Updateable<Msg, Cmd> for AppCore<E> {
             Msg::SessionsClosed => {}
             Msg::ConfigSaved(result) => ret.extend(self.handle_config_saved(result)),
             Msg::NotificationSent(_) => {}
-            Msg::DuplicateWarningDismiss => {
-                ret.push(Cmd::CloseAllSessions);
-                ret.extend(self.update(Msg::Router(RouterMsg::GoTo(Page::Timer))));
-                let auto_start = self.config.pomodoro.timer.auto_start_on_launch;
-                if auto_start {
-                    ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::Start)));
-                } else {
-                    ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::StartPaused)));
-                }
+            Msg::DuplicateWarningDismiss => self.show_duplicate_warning = false,
+            Msg::DuplicateWarningQuit => ret.extend(self.update(Msg::Quit)),
+            Msg::UnsavedWarningSave => {
+                ret.extend(self.update(Msg::ViewSettingsCmd(SettingsCmd::SaveConfig)));
+                ret.extend(self.update(Msg::Quit));
+                self.show_unsaved_warning = false
             }
-            Msg::DuplicateWarningQuit => {
-                ret.extend(self.update(Msg::Router(RouterMsg::Quit)));
+            Msg::UnsavedWarningQuit => ret.extend(self.update(Msg::ForceQuit)),
+            Msg::UnsavedWarningCancel => self.show_unsaved_warning = false,
+            Msg::Quit => ret.extend(self.handle_quit()),
+            Msg::ForceQuit => self.is_quit = true,
+            Msg::ResetWarningProceed => {
+                ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::ResetSession)));
+                self.show_reset_warning = false;
             }
+            Msg::ResetWarningCancel => self.show_reset_warning = false,
+            Msg::ResetWarningShow => self.show_reset_warning = true,
         }
         ret
     }
 }
 
 impl<E: EffectHandler> AppCore<E> {
+    fn handle_quit(&mut self) -> Vec<Cmd> {
+        let mut ret = vec![];
+        if self.is_config_dirty() {
+            self.show_unsaved_warning = true;
+        } else {
+            self.is_quit = true;
+            ret.push(Cmd::Quit);
+        }
+        ret
+    }
+
     fn handle_tick(&mut self) -> Vec<Cmd> {
         let mut ret = vec![];
 
@@ -336,7 +388,7 @@ impl<E: EffectHandler> AppCore<E> {
     fn translate_router_cmd(&mut self, cmd: RouterCmd) -> Vec<Cmd> {
         let ret = vec![];
         match cmd {
-            RouterCmd::Quit => {}
+            RouterCmd::None => {}
         }
         ret
     }
@@ -366,6 +418,7 @@ impl<E: EffectHandler> AppCore<E> {
             }
             SettingsCmd::SaveConfig => {
                 ret.push(Cmd::SaveConfig(Box::new(self.config.clone())));
+                self.config_snapshot = self.config.clone();
             }
             SettingsCmd::ShowToast { message, r#type } => {
                 ret.push(Cmd::ShowToast {

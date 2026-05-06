@@ -74,9 +74,9 @@ fn view(
     use tomo::ui::tui::TuiRunner;
 
     let effect = TuiEffectHandler::new(sound, notify, repo);
-    let core = AppCore::new(pomo, conf, effect);
+    let core = AppCore::new(pomo, conf, effect, is_duplicate);
 
-    Box::new(TuiRunner::new(core, is_duplicate).unwrap())
+    Box::new(TuiRunner::new(core).unwrap())
 }
 
 fn repo(path: &Path) -> Repo {

@@ -8,14 +8,13 @@ pub enum Page {
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
 pub enum RouterMsg {
-    Quit,
     Stay,
     GoTo(Page),
 }
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
 pub enum RouterCmd {
-    Quit,
+    None,
 }
 
 impl From<Page> for RouterMsg {
@@ -26,39 +25,25 @@ impl From<Page> for RouterMsg {
 
 #[derive(Debug)]
 pub struct Router {
-    active_page: Option<Page>,
+    active_page: Page,
 }
 
 impl Router {
     pub fn new(page: Page) -> Self {
-        Self {
-            active_page: Some(page),
-        }
+        Self { active_page: page }
     }
 
-    pub fn quit(&mut self) {
-        self.active_page = None
-    }
-
-    pub fn active_page(&self) -> Option<Page> {
+    pub fn active_page(&self) -> Page {
         self.active_page
-    }
-
-    pub fn is_quit(&self) -> bool {
-        self.active_page.is_none()
     }
 }
 
 impl Updateable<RouterMsg, RouterCmd> for Router {
     fn update(&mut self, msg: RouterMsg) -> Vec<RouterCmd> {
-        let mut ret = vec![];
+        let ret = vec![];
         match msg {
-            RouterMsg::Quit => {
-                self.active_page = None;
-                ret.push(RouterCmd::Quit)
-            }
             RouterMsg::Stay => {}
-            RouterMsg::GoTo(page) => self.active_page = Some(page),
+            RouterMsg::GoTo(page) => self.active_page = page,
         }
         ret
     }
@@ -69,19 +54,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn quit() {
-        let mut router = Router::new(Page::Timer);
-        router.quit();
-
-        assert!(router.is_quit())
-    }
-
-    #[test]
     fn navigate() {
         let mut router = Router::new(Page::Timer);
-        assert_eq!(router.active_page(), Some(Page::Timer));
+        assert_eq!(router.active_page(), Page::Timer);
 
         router.update(RouterMsg::GoTo(Page::Settings));
-        assert_eq!(router.active_page(), Some(Page::Settings));
+        assert_eq!(router.active_page(), Page::Settings);
     }
 }
