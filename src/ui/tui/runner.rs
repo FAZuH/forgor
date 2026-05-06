@@ -137,6 +137,8 @@ impl TuiRunner {
                 } else if self.core.show_unsaved_warning() {
                     // Unsaved warning
                     f.render_widget(UnsavedWarning::new(), area);
+                } else if self.core.show_reset_warning() {
+                    f.render_widget(ResetWarning::new(), area);
                 }
             })?;
         }
@@ -178,6 +180,11 @@ impl TuiRunner {
                     continue;
                 }
 
+                if self.core.show_reset_warning() {
+                    self.handle_reset_warning(&event);
+                    continue;
+                }
+
                 self.common_handler(&event);
 
                 match self.core.router().active_page() {
@@ -198,6 +205,21 @@ impl TuiRunner {
             },
             Event::Resize(..) => self.redraw(),
             _ => {}
+        }
+    }
+
+    fn handle_reset_warning(&mut self, event: &Event) {
+        if let Event::Key(key) = event {
+            use KeyCode as K;
+            match key.code {
+                K::Enter | K::Char('y') => {
+                    dsp!(self, core, Msg::ResetWarningProceed);
+                }
+                K::Esc | K::Char('n') => {
+                    dsp!(self, core, Msg::ResetWarningCancel);
+                }
+                _ => {}
+            }
         }
     }
 
@@ -224,11 +246,10 @@ impl TuiRunner {
             use KeyCode as K;
             match key.code {
                 K::Enter | K::Char('y') => {
-                    self.core.dispatch(Msg::DuplicateWarningDismiss);
-                    self.redraw();
+                    dsp!(self, core, Msg::DuplicateWarningDismiss);
                 }
                 K::Char('q') | K::Esc | K::Char('n') => {
-                    self.core.dispatch(Msg::DuplicateWarningQuit);
+                    dsp!(self, core, Msg::DuplicateWarningQuit);
                 }
                 _ => {}
             }
@@ -250,7 +271,7 @@ impl TuiRunner {
                 K::Up | K::Char('k') => dsp!(self, pomo, Add(Duration::from_secs(60))),
                 K::Char(' ') => dsp!(self, pomo, TogglePause),
                 K::Enter => dsp!(self, pomo, SkipSession),
-                K::Backspace => dsp!(self, pomo, ResetSession),
+                K::Backspace => dsp!(self, core, Msg::ResetWarningShow),
                 K::Char('s') => dsp!(self, router, RouterMsg::GoTo(Page::Settings)),
                 K::Char('/') | K::Char('?') => dsp!(self, timer, TimerMsg::ToggleShowKeybinds),
                 _ => {}

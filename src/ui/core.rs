@@ -45,6 +45,11 @@ pub enum Msg {
     UnsavedWarningSave,
     UnsavedWarningCancel,
     UnsavedWarningQuit,
+
+    // Timer reset warning
+    ResetWarningShow,
+    ResetWarningProceed,
+    ResetWarningCancel,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -88,6 +93,7 @@ pub struct AppCore<E: EffectHandler> {
     is_prompting_transition: bool,
     show_duplicate_warning: bool,
     show_unsaved_warning: bool,
+    show_reset_warning: bool,
     is_quit: bool,
 }
 
@@ -104,6 +110,7 @@ impl<E: EffectHandler> AppCore<E> {
             is_prompting_transition: false,
             show_duplicate_warning: is_duplicate,
             show_unsaved_warning: false,
+            show_reset_warning: false,
             is_quit: false,
         }
     }
@@ -165,6 +172,10 @@ impl<E: EffectHandler> AppCore<E> {
         self.show_unsaved_warning
     }
 
+    pub fn show_reset_warning(&self) -> bool {
+        self.show_reset_warning
+    }
+
     pub fn is_quit(&self) -> bool {
         self.is_quit
     }
@@ -209,6 +220,12 @@ impl<E: EffectHandler> Updateable<Msg, Cmd> for AppCore<E> {
             Msg::UnsavedWarningCancel => self.show_unsaved_warning = false,
             Msg::Quit => ret.extend(self.handle_quit()),
             Msg::ForceQuit => self.is_quit = true,
+            Msg::ResetWarningProceed => {
+                ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::ResetSession)));
+                self.show_reset_warning = false;
+            }
+            Msg::ResetWarningCancel => self.show_reset_warning = false,
+            Msg::ResetWarningShow => self.show_reset_warning = true,
         }
         ret
     }
