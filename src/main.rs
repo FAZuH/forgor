@@ -23,6 +23,7 @@ type View = Box<dyn Runner>;
 fn main() -> Result<(), AppError> {
     let cli = Cli::parse();
 
+    // config
     let mut conf = if let Some(ref conf) = cli.config_path {
         Config::new(conf.clone())
     } else {
@@ -30,22 +31,14 @@ fn main() -> Result<(), AppError> {
     };
     conf.load()?;
 
+    let is_duplicate_instance = is_duplicate(&conf.conf_dir);
+
+    // logging
     setup_logging(&conf.logs_path)?;
     color_eyre::install().unwrap();
     info!("initializing {} v{}", tomo::APP_NAME, tomo::APP_VERSION);
 
-    let lock_path = conf.conf_dir.join("tomo.lock");
-    let lock_file = std::fs::OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(&lock_path)
-        .unwrap();
-    let mut lock = fd_lock::RwLock::new(lock_file);
-    let _guard = lock.try_write();
-    let is_duplicate_instance = _guard.is_err();
-
+    // db
     let repo = repo(&conf.db_path);
     let initial_task = cli.task.clone().map(|name| {
         repo.task()
@@ -54,6 +47,7 @@ fn main() -> Result<(), AppError> {
             .unwrap_or_else(|_| repo.task().add(name).unwrap().id)
     });
 
+    // services
     let sound = alarm();
     let notify = notify();
     let pomo = pomodoro(&cli, &conf);
@@ -123,4 +117,17 @@ fn alarm() -> Sound {
 
 fn notify() -> Notify {
     Box::new(DesktopNotifyService)
+}
+
+fn is_duplicate(conf_dir: &std::path::Path) -> bool {
+    let lock_path = conf_dir.join("tomo.lock");
+    let lock_file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&lock_path)
+        .unwrap();
+    let mut lock = fd_lock::RwLock::new(lock_file);
+    lock.try_write().is_err()
 }
