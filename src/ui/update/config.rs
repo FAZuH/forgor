@@ -181,7 +181,6 @@ pub enum SettingsMsg<'a> {
     SelectDown,
     SelectUp,
     SetShowKeybinds(bool),
-    SetUnsavedChanges(bool),
     ToggleShowKeybinds,
     SelectForCopy,
     CopyValue(&'a PomodoroConfig),

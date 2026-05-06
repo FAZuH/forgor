@@ -35,7 +35,6 @@ pub struct TuiSettingsView {
     select_for_copy: Option<SettingsItem>,
     scroll_state: ScrollViewState,
     prompt: Option<SettingsPrompt>,
-    has_unsaved_changes: bool,
     show_keybinds: bool,
 }
 
@@ -47,7 +46,7 @@ pub struct TuiSettingsView {
 // ---------------------------------------------------------
 
 impl TuiSettingsView {
-    pub fn render(&mut self, canvas: &mut Frame, state: &Config) {
+    pub fn render(&mut self, canvas: &mut Frame, state: &Config, is_config_dirty: bool) {
         let area = canvas.area();
         let buf = canvas.buffer_mut();
 
@@ -71,7 +70,7 @@ impl TuiSettingsView {
 
         // Render unsaved changes indicator in the spacing row between title and sections
         let indicator_area = Rect::new(0, 0, content_width, 1);
-        self.save_indicator(&mut scroll_view, indicator_area);
+        self.save_indicator(&mut scroll_view, indicator_area, is_config_dirty);
 
         // Render sections with proper spacing
         let mut y = 2u16;
@@ -116,13 +115,12 @@ impl TuiSettingsView {
             select_for_copy: None,
             scroll_state: ScrollViewState::default(),
             prompt: None,
-            has_unsaved_changes: false,
             show_keybinds: false,
         }
     }
 
-    fn save_indicator(&self, scroll: &mut ScrollView, area: Rect) {
-        if self.has_unsaved_changes() {
+    fn save_indicator(&self, scroll: &mut ScrollView, area: Rect, is_config_dirty: bool) {
+        if is_config_dirty {
             scroll.render_widget(SAVED_INDICATOR.clone(), area);
         }
     }
@@ -311,7 +309,6 @@ impl<'a> Updateable<SettingsMsg<'a>, SettingsCmd> for TuiSettingsView {
             SelectDown => self.select_down(),
             SelectUp => self.select_up(),
             SetShowKeybinds(v) => self.show_keybinds = v,
-            SetUnsavedChanges(v) => self.has_unsaved_changes = v,
             ToggleShowKeybinds => self.toggle_keybinds(),
             StartEdit(config) => self.start_editing_for_field(config),
             CopyValue(config) => cmds.extend(self.copy_value(config)),
@@ -329,10 +326,6 @@ impl TuiSettingsView {
 
     pub fn scroll_state_mut(&mut self) -> &mut ScrollViewState {
         &mut self.scroll_state
-    }
-
-    pub fn has_unsaved_changes(&self) -> bool {
-        self.has_unsaved_changes
     }
 
     /// Get current selection index

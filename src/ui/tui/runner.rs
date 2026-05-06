@@ -39,21 +39,21 @@ impl Runner for TuiRunner {
 macro_rules! dsp {
     ($self:ident, core, $page:expr) => {{
         $self.core.update($page);
-        $self.redraw = true;
+        $self.redraw();
     }};
     ($self:ident, pomo, $msg:expr) => {{
         log::trace!("msg config: {:?}", $msg);
         $self.core.dispatch(Msg::Pomodoro($msg));
-        $self.redraw = true;
+        $self.redraw();
     }};
     ($self:ident, config, $msg:expr) => {{
         log::trace!("msg config: {:?}", $msg);
         $self.core.dispatch(Msg::Config($msg));
-        $self.redraw = true;
+        $self.redraw();
     }};
     ($self:ident, router, $page:expr) => {{
         $self.core.dispatch(Msg::Router($page));
-        $self.redraw = true;
+        $self.redraw();
     }};
     ($self:ident, timer, $msg:expr) => {{
         log::trace!("msg timer: {:?}", $msg);
@@ -61,14 +61,18 @@ macro_rules! dsp {
         for cmd in cmds {
             $self.core.dispatch(Msg::ViewTimerCmd(cmd));
         }
-        $self.redraw = true;
+        $self.redraw();
+    }};
+    ($self:ident, msg, $msg:expr) => {{
+        $self.core.dispatch($msg);
+        $self.redraw();
     }};
     ($self:ident, setting, $msg:expr) => {{
         let cmds = $self.settings.update($msg);
         for cmd in cmds {
             $self.core.dispatch(Msg::ViewSettingsCmd(cmd));
         }
-        $self.redraw = true;
+        $self.redraw();
     }};
 }
 
@@ -110,12 +114,17 @@ impl TuiRunner {
 
     fn render_terminal(&mut self) -> Result<(), TuiError> {
         if self.take_redraw() {
-            self.sync_views();
-
             self.terminal.draw(|f| {
                 match self.core.router().active_page() {
-                    Some(Page::Timer) => self.timer.render(f, self.core.pomodoro()),
-                    Some(Page::Settings) => self.settings.render(f, self.core.config()),
+                    Some(Page::Timer) => {
+                        let is_prompting_transition = self.core.is_prompting_transition();
+                        self.timer
+                            .render(f, self.core.pomodoro(), is_prompting_transition)
+                    }
+                    Some(Page::Settings) => {
+                        let is_config_dirty = self.core.is_config_dirty();
+                        self.settings.render(f, self.core.config(), is_config_dirty)
+                    }
                     None => {}
                 }
 
@@ -139,14 +148,6 @@ impl TuiRunner {
             self.core.dispatch(Msg::Tick);
             self.redraw();
         }
-    }
-
-    fn sync_views(&mut self) {
-        let is_trans = self.core.is_prompting_transition();
-        let changes = self.core.is_config_dirty();
-
-        dsp!(self, timer, TimerMsg::SetPromptTransition(is_trans));
-        dsp!(self, setting, SettingsMsg::SetUnsavedChanges(changes));
     }
 
     // ---------------------------------------------------------
@@ -212,7 +213,7 @@ impl TuiRunner {
     }
 
     fn handle_timer(&mut self, event: Event) {
-        if self.timer.prompt_transition() {
+        if self.core.is_prompting_transition() {
             return self.handle_timer_transition(event);
         }
 
@@ -237,11 +238,22 @@ impl TuiRunner {
 
     fn handle_timer_transition(&mut self, event: Event) {
         use KeyCode as K;
-        use TimerMsg::*;
         if let Event::Key(key) = event {
             match key.code {
-                K::Enter | K::Char('y') => dsp!(self, timer, PromptNextSessionAnswerYes(true)),
-                K::Esc | K::Char('n') => dsp!(self, timer, PromptNextSessionAnswerYes(false)),
+                K::Enter | K::Char('y') => {
+                    dsp!(
+                        self,
+                        msg,
+                        Msg::ViewTimerCmd(TimerCmd::PromptTransitionAnsweredYes)
+                    )
+                }
+                K::Esc | K::Char('n') => {
+                    dsp!(
+                        self,
+                        msg,
+                        Msg::ViewTimerCmd(TimerCmd::PromptTransitionAnsweredNo)
+                    )
+                }
                 _ => {}
             }
         }
