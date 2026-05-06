@@ -16,19 +16,17 @@ use crate::ui::prelude::*;
 use crate::utils;
 
 pub struct TuiTimerView {
-    prompt_transition: bool,
     show_keybinds: bool,
 }
 
 impl TuiTimerView {
     pub fn new() -> Self {
         Self {
-            prompt_transition: false,
             show_keybinds: false,
         }
     }
 
-    pub fn render(&self, canvas: &mut Frame, state: &Pomodoro) {
+    pub fn render(&self, canvas: &mut Frame, state: &Pomodoro, is_prompting_transition: bool) {
         let area = canvas.area();
         let buf = canvas.buffer_mut();
 
@@ -47,14 +45,14 @@ impl TuiTimerView {
         self.progress_bar(rows[6], buf, progress, mode);
         self.stats(rows[8], buf, state);
         self.keybinds(rows[10], buf, show_binds);
-        self.prompt(area, buf, state);
+        self.prompt(area, buf, state, is_prompting_transition);
     }
 }
 
 impl TuiTimerView {
     // Render popup if prompt is active
-    fn prompt(&self, area: Rect, buf: &mut Buffer, pomo: &Pomodoro) {
-        if self.prompt_transition() {
+    fn prompt(&self, area: Rect, buf: &mut Buffer, pomo: &Pomodoro, is_prompting_transition: bool) {
+        if is_prompting_transition {
             let next = pomo.next_mode().to_string().to_lowercase();
             let body = Text::from(vec![
                 Line::from(""),
@@ -303,17 +301,8 @@ static KEYBINDS_OFF: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
 impl Updateable<TimerMsg, TimerCmd> for TuiTimerView {
     fn update(&mut self, msg: TimerMsg) -> Vec<TimerCmd> {
         use TimerMsg::*;
-        let mut ret = vec![];
+        let ret = vec![];
         match msg {
-            SetPromptTransition(v) => self.prompt_transition = v,
-            PromptNextSessionAnswerYes(v) => {
-                if v {
-                    ret.push(TimerCmd::PromptTransitionAnsweredYes)
-                } else {
-                    ret.push(TimerCmd::PromptTransitionAnsweredNo)
-                }
-                self.prompt_transition = false
-            }
             SetShowKeybinds(v) => self.show_keybinds = v,
             ToggleShowKeybinds => {
                 let new = !self.show_keybinds;
@@ -326,10 +315,6 @@ impl Updateable<TimerMsg, TimerCmd> for TuiTimerView {
 }
 
 impl TuiTimerView {
-    pub fn prompt_transition(&self) -> bool {
-        self.prompt_transition
-    }
-
     pub fn show_keybinds(&self) -> bool {
         self.show_keybinds
     }

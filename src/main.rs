@@ -34,20 +34,41 @@ fn main() -> Result<(), AppError> {
     color_eyre::install().unwrap();
     info!("initializing {} v{}", tomo::APP_NAME, tomo::APP_VERSION);
 
+    let lock_path = conf.conf_dir.join("tomo.lock");
+    let lock_file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&lock_path)
+        .unwrap();
+    let mut lock = fd_lock::RwLock::new(lock_file);
+    let _guard = lock.try_write();
+    let is_duplicate_instance = _guard.is_err();
+
     let repo = repo(&conf.db_path);
     let sound = alarm();
     let notify = notify();
     let pomo = pomodoro(&cli, &conf);
 
-    repo.session().close_all_sessions().unwrap();
+    if !is_duplicate_instance {
+        repo.session().close_all_sessions().unwrap();
+    }
 
-    let mut runner = view(conf, repo, sound, notify, pomo);
+    let mut runner = view(conf, repo, sound, notify, pomo, is_duplicate_instance);
     info!("starting view");
     runner.run().unwrap();
     Ok(())
 }
 
-fn view(conf: Config, repo: Repo, sound: Sound, notify: Notify, pomo: Pomodoro) -> View {
+fn view(
+    conf: Config,
+    repo: Repo,
+    sound: Sound,
+    notify: Notify,
+    pomo: Pomodoro,
+    is_duplicate: bool,
+) -> View {
     use tomo::ui::core::AppCore;
     use tomo::ui::tui::TuiEffectHandler;
     use tomo::ui::tui::TuiRunner;
@@ -55,7 +76,7 @@ fn view(conf: Config, repo: Repo, sound: Sound, notify: Notify, pomo: Pomodoro) 
     let effect = TuiEffectHandler::new(sound, notify, repo);
     let core = AppCore::new(pomo, conf, effect);
 
-    Box::new(TuiRunner::new(core).unwrap())
+    Box::new(TuiRunner::new(core, is_duplicate).unwrap())
 }
 
 fn repo(path: &Path) -> Repo {
