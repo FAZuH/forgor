@@ -1,3 +1,16 @@
+## 0.2.6 (2026-05-06)
+
+
+### New Features
+
+* Add confirmation prompt when resetting timer ([d2dc423](https://github.com/FAZuH/tomo/commit/d2dc423bff92191aa4cf7cc609cd9bb43dfcc251)), closes [#56](https://github.com/FAZuH/tomo/issues/56)
+* Add warning when quitting with unsaved settings changes ([f63dec3](https://github.com/FAZuH/tomo/commit/f63dec3e5a4efe8cda817f2aeef4932ec8ab5368)), closes [#37](https://github.com/FAZuH/tomo/issues/37)
+
+
+### Bug Fixes
+
+* Frame not redrawing when typing on settings ([7f812bf](https://github.com/FAZuH/tomo/commit/7f812bffd0c71bb9904018db621c815ffc92be50))
+
 ## 0.2.5 (2026-05-06)
 
 
@@ -67,13 +80,4 @@
 ### Performance Improvements
 
 * Improve initial draw speed ([99c9bc5](https://github.com/FAZuH/tomo/commit/99c9bc5e7e3858a36bf1c0150ecff9636a5adea0))
-
-## 0.2.1 (2026-05-01)
-
-
-### Performance Improvements
-
-* Fix tick timer bug causing high CPU usage ([d36489e](https://github.com/FAZuH/tomo/commit/d36489e37b93fd0b43ff85dd1143152cb3d5721a))
-* Improve idle CPU usage ([f74a09f](https://github.com/FAZuH/tomo/commit/f74a09f6a99d6896b060d000572e8e9b84454c46))
-* Redraw only when a valid input is pressed ([50c0e1d](https://github.com/FAZuH/tomo/commit/50c0e1ddc46f8e67129886b3298c6151ced8b3da))
 
