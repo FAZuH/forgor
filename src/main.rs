@@ -44,7 +44,7 @@ fn main() -> Result<(), AppError> {
         repo.task()
             .find_by_name(name.clone())
             .map(|t| t.id)
-            .unwrap_or_else(|_| repo.task().add(name).unwrap().id)
+            .unwrap_or_else(|_| repo.task().add(name, None).unwrap().id)
     });
 
     // services

@@ -6,13 +6,13 @@ pub trait ProjectRepo {}
 pub trait TagRepo {}
 
 pub trait TaskRepo {
-    fn add(&self, name: String) -> RepoResult<Task>;
+    fn add(&self, name: String, description: Option<String>) -> RepoResult<TaskRow>;
 
-    fn find_by_name(&self, name: String) -> RepoResult<Task>;
+    fn find_by_name(&self, name: String) -> RepoResult<TaskRow>;
 }
 
 pub trait SessionRepo {
-    fn new_session(&self, task_id: Option<i32>, state: PomodoroState) -> RepoResult<Session>;
+    fn new_session(&self, task_id: Option<i32>, state: PomodoroState) -> RepoResult<SessionRow>;
 
     fn update(&self, id: i32) -> RepoResult<usize>;
 

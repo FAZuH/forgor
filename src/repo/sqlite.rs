@@ -20,7 +20,7 @@ use crate::repo::SessionRepo;
 use crate::repo::TagRepo;
 use crate::repo::TaskRepo;
 use crate::repo::error::RepoError;
-use crate::repo::model::Task;
+use crate::repo::model::TaskRow;
 use crate::repo::model::*;
 
 type SqlitePool = Pool<ConnectionManager<SqliteConnection>>;
@@ -103,22 +103,22 @@ impl SqliteTaskRepo {
 }
 
 impl TaskRepo for SqliteTaskRepo {
-    fn add(&self, task_name: String) -> RepoResult<Task> {
+    fn add(&self, task_name: String, desc: Option<String>) -> RepoResult<TaskRow> {
         use crate::repo::schema::tasks::*;
         let task = diesel::insert_into(table)
-            .values(name.eq(task_name))
-            .returning(Task::as_returning())
+            .values((name.eq(task_name), description.eq(desc)))
+            .returning(TaskRow::as_returning())
             .get_result(&mut self.pool.get()?)?;
 
         Ok(task)
     }
 
-    fn find_by_name(&self, task_name: String) -> RepoResult<Task> {
+    fn find_by_name(&self, task_name: String) -> RepoResult<TaskRow> {
         use crate::repo::schema::tasks::*;
         let task = table
             .filter(name.eq(task_name))
             .limit(1)
-            .select(Task::as_select())
+            .select(TaskRow::as_select())
             .get_result(&mut self.pool.get()?)?;
 
         Ok(task)
@@ -131,7 +131,7 @@ pub struct SqliteSessionRepo {
 }
 
 impl SessionRepo for SqliteSessionRepo {
-    fn new_session(&self, task_id: Option<i32>, state: PomodoroState) -> RepoResult<Session> {
+    fn new_session(&self, task_id: Option<i32>, state: PomodoroState) -> RepoResult<SessionRow> {
         use crate::repo::schema::sessions as s;
         let now = now();
         let ret = diesel::insert_into(s::table)
@@ -141,7 +141,7 @@ impl SessionRepo for SqliteSessionRepo {
                 s::updated_at.eq(now),
                 s::pomodoro_state.eq(state),
             ))
-            .returning(Session::as_returning())
+            .returning(SessionRow::as_returning())
             .get_result(&mut self.pool.get()?)?;
 
         Ok(ret)

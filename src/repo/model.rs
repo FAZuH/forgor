@@ -18,7 +18,7 @@ use crate::repo::schema::tasks;
 #[derive(Debug, Clone, PartialEq, Eq, Queryable, Selectable, Insertable, Identifiable)]
 #[diesel(table_name = projects)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
-pub struct Project {
+pub struct ProjectRow {
     pub id: i32,
     pub name: String,
     pub description: Option<String>,
@@ -27,7 +27,7 @@ pub struct Project {
 #[derive(Debug, Clone, PartialEq, Eq, Queryable, Selectable, Insertable, Identifiable)]
 #[diesel(table_name = tags)]
 #[diesel(check_for_backend(Sqlite))]
-pub struct Tag {
+pub struct TagRow {
     pub id: i32,
     pub name: String,
     pub description: Option<String>,
@@ -38,9 +38,9 @@ pub struct Tag {
 )]
 #[diesel(table_name = tasks)]
 #[diesel(check_for_backend(Sqlite))]
-#[diesel(belongs_to(Task, foreign_key = parent_id))]
-#[diesel(belongs_to(Project))]
-pub struct Task {
+#[diesel(belongs_to(TaskRow, foreign_key = parent_id))]
+#[diesel(belongs_to(ProjectRow, foreign_key = project_id))]
+pub struct TaskRow {
     pub id: i32,
     pub name: String,
     pub description: Option<String>,
@@ -56,8 +56,8 @@ pub struct Task {
 )]
 #[diesel(table_name = sessions)]
 #[diesel(check_for_backend(Sqlite))]
-#[diesel(belongs_to(Task))]
-pub struct Session {
+#[diesel(belongs_to(TaskRow, foreign_key = task_id))]
+pub struct SessionRow {
     pub id: i32,
     pub task_id: Option<i32>,
     pub start_at: NaiveDateTime,
@@ -71,10 +71,10 @@ pub struct Session {
     Debug, Clone, PartialEq, Eq, Queryable, Selectable, Insertable, Identifiable, Associations,
 )]
 #[diesel(table_name = project_default_tags)]
-#[diesel(belongs_to(Project))]
-#[diesel(belongs_to(Tag))]
+#[diesel(belongs_to(ProjectRow, foreign_key = project_id))]
+#[diesel(belongs_to(TagRow, foreign_key = tag_id))]
 #[diesel(primary_key(project_id, tag_id))]
-pub struct ProjectDefaultTag {
+pub struct ProjectDefaultTagRow {
     pub project_id: i32,
     pub tag_id: i32,
 }
@@ -83,10 +83,10 @@ pub struct ProjectDefaultTag {
     Debug, Clone, PartialEq, Eq, Queryable, Selectable, Insertable, Identifiable, Associations,
 )]
 #[diesel(table_name = task_tags)]
-#[diesel(belongs_to(Task))]
-#[diesel(belongs_to(Tag))]
+#[diesel(belongs_to(TaskRow, foreign_key = task_id))]
+#[diesel(belongs_to(TagRow, foreign_key = tag_id))]
 #[diesel(primary_key(task_id, tag_id))]
-pub struct TaskTag {
+pub struct TaskTagRow {
     pub task_id: i32,
     pub tag_id: i32,
 }
