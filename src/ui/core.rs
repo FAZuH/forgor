@@ -67,7 +67,6 @@ pub enum Cmd {
     // Persistence
     SaveConfig(Box<Config>), // Box, because Config is large.
     RunHook(String),
-    // Views
 }
 
 pub struct AppCore<E: EffectHandler> {
@@ -79,10 +78,11 @@ pub struct AppCore<E: EffectHandler> {
     active_session_id: Option<i32>,
     config_snapshot: Config,
     is_prompting_transition: bool,
+    show_duplicate_warning: bool,
 }
 
 impl<E: EffectHandler> AppCore<E> {
-    pub fn new(pomodoro: Pomodoro, config: Config, effects: E) -> Self {
+    pub fn new(pomodoro: Pomodoro, config: Config, effects: E, is_duplicate: bool) -> Self {
         Self {
             effects,
             pomodoro,
@@ -91,6 +91,7 @@ impl<E: EffectHandler> AppCore<E> {
             config,
             active_session_id: None,
             is_prompting_transition: false,
+            show_duplicate_warning: is_duplicate,
         }
     }
 
@@ -142,6 +143,10 @@ impl<E: EffectHandler> AppCore<E> {
     pub fn is_config_dirty(&self) -> bool {
         self.config != self.config_snapshot
     }
+
+    pub fn show_duplicate_warning(&self) -> bool {
+        self.show_duplicate_warning
+    }
 }
 
 impl<E: EffectHandler> Updateable<Msg, Cmd> for AppCore<E> {
@@ -172,19 +177,8 @@ impl<E: EffectHandler> Updateable<Msg, Cmd> for AppCore<E> {
             Msg::SessionsClosed => {}
             Msg::ConfigSaved(result) => ret.extend(self.handle_config_saved(result)),
             Msg::NotificationSent(_) => {}
-            Msg::DuplicateWarningDismiss => {
-                ret.push(Cmd::CloseAllSessions);
-                ret.extend(self.update(Msg::Router(RouterMsg::GoTo(Page::Timer))));
-                let auto_start = self.config.pomodoro.timer.auto_start_on_launch;
-                if auto_start {
-                    ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::Start)));
-                } else {
-                    ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::StartPaused)));
-                }
-            }
-            Msg::DuplicateWarningQuit => {
-                ret.extend(self.update(Msg::Router(RouterMsg::Quit)));
-            }
+            Msg::DuplicateWarningDismiss => ret.extend(self.handle_duplicate_warning_dismiss()),
+            Msg::DuplicateWarningQuit => ret.extend(self.update(Msg::Router(RouterMsg::Quit))),
         }
         ret
     }
@@ -248,6 +242,24 @@ impl<E: EffectHandler> AppCore<E> {
             ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::NextSession)));
         } else {
             self.is_prompting_transition = true;
+        }
+
+        ret
+    }
+
+    fn handle_duplicate_warning_dismiss(&mut self) -> Vec<Cmd> {
+        let mut ret = vec![];
+
+        self.show_duplicate_warning = false;
+
+        ret.push(Cmd::CloseAllSessions);
+        ret.extend(self.update(Msg::Router(RouterMsg::GoTo(Page::Timer))));
+
+        let auto_start = self.config.pomodoro.timer.auto_start_on_launch;
+        if auto_start {
+            ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::Start)));
+        } else {
+            ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::StartPaused)));
         }
 
         ret
@@ -336,7 +348,13 @@ impl<E: EffectHandler> AppCore<E> {
     fn translate_router_cmd(&mut self, cmd: RouterCmd) -> Vec<Cmd> {
         let ret = vec![];
         match cmd {
-            RouterCmd::Quit => {}
+            RouterCmd::Quit => {
+                // if self.is_config_dirty() {
+                //     ret.push(Cmd::)
+                // } else {
+                //     ret.push(Cmd::Quit);
+                // }
+            }
         }
         ret
     }

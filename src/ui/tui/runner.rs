@@ -27,7 +27,6 @@ pub struct TuiRunner {
 
     timer: TuiTimerView,
     settings: TuiSettingsView,
-    show_duplicate_warning: bool,
 }
 
 impl Runner for TuiRunner {
@@ -77,7 +76,7 @@ macro_rules! dsp {
 }
 
 impl TuiRunner {
-    pub fn new(core: AppCore<TuiEffectHandler>, is_duplicate: bool) -> Result<Self, UiError> {
+    pub fn new(core: AppCore<TuiEffectHandler>) -> Result<Self, UiError> {
         let terminal = Tui::new()?;
 
         Ok(Self {
@@ -87,7 +86,6 @@ impl TuiRunner {
             settings: TuiSettingsView::new(),
             tick: TickTimer::default(),
             redraw: true,
-            show_duplicate_warning: is_duplicate,
         })
     }
 
@@ -134,7 +132,7 @@ impl TuiRunner {
                 toast.set_area(area);
                 f.render_widget(&**toast, area);
 
-                if self.show_duplicate_warning {
+                if self.core.show_duplicate_warning() {
                     f.render_widget(DuplicateWarning::new(), area);
                 }
             })?;
@@ -143,11 +141,15 @@ impl TuiRunner {
     }
 
     fn tick(&mut self) {
-        if self.tick.new_tick() && !self.show_duplicate_warning {
+        if self.should_tick() {
             self.core.effects_mut().toast_mut().tick();
             self.core.dispatch(Msg::Tick);
             self.redraw();
         }
+    }
+
+    fn should_tick(&mut self) -> bool {
+        self.tick.new_tick() && !self.core.show_duplicate_warning()
     }
 
     // ---------------------------------------------------------
@@ -170,7 +172,7 @@ impl TuiRunner {
 
                 self.common_handler(&event);
 
-                if self.show_duplicate_warning {
+                if self.core.show_duplicate_warning() {
                     self.handle_duplicate_warning(&event);
                     continue;
                 }
@@ -200,7 +202,6 @@ impl TuiRunner {
             use KeyCode as K;
             match key.code {
                 K::Enter | K::Char('y') => {
-                    self.show_duplicate_warning = false;
                     self.core.dispatch(Msg::DuplicateWarningDismiss);
                     self.redraw();
                 }
