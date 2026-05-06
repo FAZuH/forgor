@@ -2,6 +2,7 @@ use ratatui::prelude::*;
 use ratatui::symbols::border;
 use tui_widgets::popup::Popup;
 
+/// A modal overlay warning about a duplicate application instance.
 pub struct DuplicateWarning {}
 
 impl DuplicateWarning {
@@ -44,6 +45,7 @@ impl Widget for DuplicateWarning {
     }
 }
 
+/// A modal overlay warning about unsaved configuration changes.
 pub struct UnsavedWarning {}
 
 impl UnsavedWarning {
@@ -85,6 +87,7 @@ impl Widget for UnsavedWarning {
     }
 }
 
+/// A modal overlay confirming the user wants to reset the timer.
 pub struct ResetWarning {}
 
 impl ResetWarning {

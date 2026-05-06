@@ -19,6 +19,7 @@ use crate::ui::tui::backend::Tui;
 use crate::ui::tui::view::*;
 use crate::ui::update::PomodoroMsg;
 
+/// The terminal UI implementation of the application runner using Crossterm and Ratatui.
 pub struct TuiRunner {
     tick: TickTimer,
     redraw: bool,

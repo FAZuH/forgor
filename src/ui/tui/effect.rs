@@ -6,6 +6,7 @@ use crate::service::cmd_runner::run_hook_command;
 use crate::ui::prelude::*;
 use crate::ui::tui::toast::ToastHandler;
 
+/// Executes side-effects for the terminal UI, such as desktop notifications or audio playback.
 pub struct TuiEffectHandler {
     toast: ToastHandler,
     sound: Box<dyn SoundService<SoundType = Alarm>>,

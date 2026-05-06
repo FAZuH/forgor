@@ -1,5 +1,6 @@
 use crate::ui::traits::Updateable;
 
+/// Top-level views available in the application.
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
 pub enum Page {
     Timer,
@@ -23,6 +24,7 @@ impl From<Page> for RouterMsg {
     }
 }
 
+/// Manages the active top-level view of the application.
 #[derive(Debug)]
 pub struct Router {
     active_page: Page,

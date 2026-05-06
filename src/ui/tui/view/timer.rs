@@ -15,6 +15,7 @@ use crate::model::Pomodoro;
 use crate::ui::prelude::*;
 use crate::utils;
 
+/// Renders the Pomodoro timer interface and manages view-local state.
 pub struct TuiTimerView {
     show_keybinds: bool,
 }

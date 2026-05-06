@@ -10,6 +10,7 @@ use crate::ui::prelude::*;
 
 // type IPomodoro = Box<dyn Updateable<PomodoroMsg, PomodoroCmd>>;
 
+/// Events and commands dispatched to the core state machine.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Msg {
     // Delegated to sub-models inside AppCore.
@@ -52,6 +53,7 @@ pub enum Msg {
     ResetWarningCancel,
 }
 
+/// Side-effects to be executed by the EffectHandler.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Cmd {
     Quit,
@@ -82,6 +84,7 @@ pub enum Cmd {
     RunHook(String),
 }
 
+/// The single source of truth for the application's business state and configuration.
 pub struct AppCore<E: EffectHandler> {
     pomodoro: Pomodoro,
     config: Config,
@@ -94,6 +97,7 @@ pub struct AppCore<E: EffectHandler> {
     is_quit: bool,
 }
 
+/// Represents the active modal overlay blocking the main interface.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Overlay {
     PromptingTransition,
@@ -123,8 +127,8 @@ impl<E: EffectHandler> AppCore<E> {
         }
     }
 
-    /// Dispatch a message and process all resulting effects
-    /// synchronously until the message queue is drained.
+    /// Dispatches a message into the state machine and resolves
+    /// any resulting side-effects synchronously.
     pub fn dispatch(&mut self, msg: Msg) {
         let cmds = self.update(msg);
         for cmd in cmds {
@@ -348,7 +352,7 @@ impl From<Mode> for PomodoroState {
     }
 }
 
-/// Outcome of a config-save effect so AppCore can update its dirty flag.
+/// Outcome of a config-save effect so that AppCore can update its dirty flag.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConfigSaveResult {
     Ok,

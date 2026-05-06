@@ -31,6 +31,7 @@ use crate::config::PomodoroConfig;
 use crate::config::Timers;
 use crate::ui::prelude::*;
 
+/// Renders the configuration interface and manages scroll position and active text prompts.
 pub struct TuiSettingsView {
     selected: SettingsItem,
     select_for_copy: Option<SettingsItem>,

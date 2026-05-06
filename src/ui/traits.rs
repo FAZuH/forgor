@@ -1,17 +1,19 @@
 use crate::ui::UiError;
 use crate::ui::prelude::*;
 
-/// backend-specific effect ui runner.
+/// Responsible for initializing the UI backend and executing the main event loop.
 pub trait Runner {
     fn run(&mut self) -> Result<(), UiError>;
 }
 
-/// backend-specific effect execution.
+/// Executes side-effects such as playing sounds, sending notifications,
+/// or interacting with the database.
 pub trait EffectHandler {
     /// Execute a command and return any result messages.
     fn execute(&mut self, cmd: Cmd) -> Vec<Msg>;
 }
 
+/// A state machine that processes messages into executable commands.
 pub trait Updateable<M, C> {
     fn update(&mut self, msg: M) -> Vec<C>;
 }
