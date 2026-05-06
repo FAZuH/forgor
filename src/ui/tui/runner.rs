@@ -27,6 +27,7 @@ pub struct TuiRunner {
 
     timer: TuiTimerView,
     settings: TuiSettingsView,
+    show_duplicate_warning: bool,
 }
 
 impl Runner for TuiRunner {
@@ -38,21 +39,21 @@ impl Runner for TuiRunner {
 macro_rules! dsp {
     ($self:ident, core, $page:expr) => {{
         $self.core.update($page);
-        $self.redraw = true;
+        $self.redraw();
     }};
     ($self:ident, pomo, $msg:expr) => {{
         log::trace!("msg config: {:?}", $msg);
         $self.core.dispatch(Msg::Pomodoro($msg));
-        $self.redraw = true;
+        $self.redraw();
     }};
     ($self:ident, config, $msg:expr) => {{
         log::trace!("msg config: {:?}", $msg);
         $self.core.dispatch(Msg::Config($msg));
-        $self.redraw = true;
+        $self.redraw();
     }};
     ($self:ident, router, $page:expr) => {{
         $self.core.dispatch(Msg::Router($page));
-        $self.redraw = true;
+        $self.redraw();
     }};
     ($self:ident, timer, $msg:expr) => {{
         log::trace!("msg timer: {:?}", $msg);
@@ -60,20 +61,25 @@ macro_rules! dsp {
         for cmd in cmds {
             $self.core.dispatch(Msg::ViewTimerCmd(cmd));
         }
-        $self.redraw = true;
+        $self.redraw();
+    }};
+    ($self:ident, msg, $msg:expr) => {{
+        $self.core.dispatch($msg);
+        $self.redraw();
     }};
     ($self:ident, setting, $msg:expr) => {{
         let cmds = $self.settings.update($msg);
         for cmd in cmds {
             $self.core.dispatch(Msg::ViewSettingsCmd(cmd));
         }
-        $self.redraw = true;
+        $self.redraw();
     }};
 }
 
 impl TuiRunner {
-    pub fn new(core: AppCore<TuiEffectHandler>) -> Result<Self, UiError> {
+    pub fn new(core: AppCore<TuiEffectHandler>, is_duplicate: bool) -> Result<Self, UiError> {
         let terminal = Tui::new()?;
+
         Ok(Self {
             core,
             terminal,
@@ -81,18 +87,12 @@ impl TuiRunner {
             settings: TuiSettingsView::new(),
             tick: TickTimer::default(),
             redraw: true,
+            show_duplicate_warning: is_duplicate,
         })
     }
 
     fn run_loop(&mut self) -> Result<(), TuiError> {
-        // Initial dispatch for auto-start.
-        let auto_start = self.core.config().pomodoro.timer.auto_start_on_launch;
-        if auto_start {
-            dsp!(self, pomo, PomodoroMsg::Start);
-        } else {
-            dsp!(self, pomo, PomodoroMsg::StartPaused);
-        }
-
+        self.initial();
         while !self.core.router().is_quit() {
             self.render_terminal()?;
             self.tick();
@@ -101,39 +101,53 @@ impl TuiRunner {
         Ok(())
     }
 
+    fn initial(&mut self) {
+        // Initial dispatch for auto-start.
+        let auto_start = self.core.config().pomodoro.timer.auto_start_on_launch;
+
+        if auto_start {
+            dsp!(self, pomo, PomodoroMsg::Start);
+        } else {
+            dsp!(self, pomo, PomodoroMsg::StartPaused);
+        }
+    }
+
     fn render_terminal(&mut self) -> Result<(), TuiError> {
         if self.take_redraw() {
-            self.sync_views();
-
             self.terminal.draw(|f| {
                 match self.core.router().active_page() {
-                    Some(Page::Timer) => self.timer.render(f, self.core.pomodoro()),
-                    Some(Page::Settings) => self.settings.render(f, self.core.config()),
+                    Some(Page::Timer) => {
+                        let is_prompting_transition = self.core.is_prompting_transition();
+                        self.timer
+                            .render(f, self.core.pomodoro(), is_prompting_transition)
+                    }
+                    Some(Page::Settings) => {
+                        let is_config_dirty = self.core.is_config_dirty();
+                        self.settings.render(f, self.core.config(), is_config_dirty)
+                    }
                     None => {}
                 }
 
+                let area = f.area();
+
                 let toast = self.core.effects_mut().toast_mut();
-                toast.set_area(f.area());
-                f.render_widget(&**toast, f.area());
+                toast.set_area(area);
+                f.render_widget(&**toast, area);
+
+                if self.show_duplicate_warning {
+                    f.render_widget(DuplicateWarning::new(), area);
+                }
             })?;
         }
         Ok(())
     }
 
     fn tick(&mut self) {
-        if self.tick.new_tick() {
+        if self.tick.new_tick() && !self.show_duplicate_warning {
             self.core.effects_mut().toast_mut().tick();
             self.core.dispatch(Msg::Tick);
             self.redraw();
         }
-    }
-
-    fn sync_views(&mut self) {
-        let is_trans = self.core.is_prompting_transition();
-        let changes = self.core.is_config_dirty();
-
-        dsp!(self, timer, TimerMsg::SetPromptTransition(is_trans));
-        dsp!(self, setting, SettingsMsg::SetUnsavedChanges(changes));
     }
 
     // ---------------------------------------------------------
@@ -153,7 +167,14 @@ impl TuiRunner {
                         continue;
                     }
                 }
+
                 self.common_handler(&event);
+
+                if self.show_duplicate_warning {
+                    self.handle_duplicate_warning(&event);
+                    continue;
+                }
+
                 match self.core.router().active_page() {
                     Some(Page::Settings) => self.handle_settings(event),
                     Some(Page::Timer) => self.handle_timer(event),
@@ -165,15 +186,34 @@ impl TuiRunner {
     }
 
     fn common_handler(&mut self, event: &Event) {
-        if let Event::Key(key) = event
-            && let KeyCode::Char('m') = key.code
-        {
-            self.core.execute_effect(Cmd::StopSound)
+        match event {
+            Event::Key(key) if key.code == KeyCode::Char('m') => {
+                self.core.execute_effect(Cmd::StopSound)
+            }
+            Event::Resize(..) => self.redraw(),
+            _ => {}
+        }
+    }
+
+    fn handle_duplicate_warning(&mut self, event: &Event) {
+        if let Event::Key(key) = event {
+            use KeyCode as K;
+            match key.code {
+                K::Enter | K::Char('y') => {
+                    self.show_duplicate_warning = false;
+                    self.core.dispatch(Msg::DuplicateWarningDismiss);
+                    self.redraw();
+                }
+                K::Char('q') | K::Esc | K::Char('n') => {
+                    self.core.dispatch(Msg::DuplicateWarningQuit);
+                }
+                _ => {}
+            }
         }
     }
 
     fn handle_timer(&mut self, event: Event) {
-        if self.timer.prompt_transition() {
+        if self.core.is_prompting_transition() {
             return self.handle_timer_transition(event);
         }
 
@@ -198,11 +238,22 @@ impl TuiRunner {
 
     fn handle_timer_transition(&mut self, event: Event) {
         use KeyCode as K;
-        use TimerMsg::*;
         if let Event::Key(key) = event {
             match key.code {
-                K::Enter | K::Char('y') => dsp!(self, timer, PromptNextSessionAnswerYes(true)),
-                K::Esc | K::Char('n') => dsp!(self, timer, PromptNextSessionAnswerYes(false)),
+                K::Enter | K::Char('y') => {
+                    dsp!(
+                        self,
+                        msg,
+                        Msg::ViewTimerCmd(TimerCmd::PromptTransitionAnsweredYes)
+                    )
+                }
+                K::Esc | K::Char('n') => {
+                    dsp!(
+                        self,
+                        msg,
+                        Msg::ViewTimerCmd(TimerCmd::PromptTransitionAnsweredNo)
+                    )
+                }
                 _ => {}
             }
         }

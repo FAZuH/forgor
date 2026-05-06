@@ -87,8 +87,6 @@ impl Updateable<PomodoroMsg, PomodoroCmd> for Pomodoro {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TimerMsg {
-    SetPromptTransition(bool),
-    PromptNextSessionAnswerYes(bool),
     SetShowKeybinds(bool),
     ToggleShowKeybinds,
 }
