@@ -304,11 +304,11 @@ impl TuiRunner {
     }
 
     fn handle_settings_edit(&mut self, event: Event) {
-        log::debug!("addr settings {:p}", &self.settings as *const _);
         if let Event::Key(key) = event
             && let Some(prompt) = self.settings.prompt_state_mut()
         {
             prompt.text_state.handle_key_event(key);
+            self.redraw = true;
 
             match prompt.text_state.status() {
                 Status::Done => {
