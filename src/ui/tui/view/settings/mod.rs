@@ -3,6 +3,7 @@ pub(crate) mod widgets;
 
 use std::borrow::Cow;
 use std::path::Path;
+use std::path::PathBuf;
 use std::sync::LazyLock;
 
 use parse::*;
@@ -137,30 +138,78 @@ impl TuiSettingsView {
 
     fn prompt(&mut self, frame: &mut Frame, area: Rect) {
         if let Some(ref mut prompt) = self.prompt_state_mut() {
-            let buf = frame.buffer_mut();
             let popup_width = 50.min(area.width.saturating_sub(4));
 
             let inner_width = popup_width.saturating_sub(2).max(1);
             let text_len = prompt.text_state.value().chars().count() as u16;
-            let prefix_len = 5; // "?  › "
+            let prefix_len = 5;
             let lines_needed = (text_len + prefix_len) / inner_width + 1;
-            let popup_height = (lines_needed + 2).max(3).min(area.height);
+            let prompt_input_height = lines_needed;
+
+            // Reserve max suggestions height to keep input pinned
+            let max_visible = MAX_VISIBLE_SUGGESTIONS;
+            let max_suggestions_height = max_visible as u16 + 1;
+            let popup_height = (prompt_input_height + max_suggestions_height + 2)
+                .max(3)
+                .min(area.height);
+
             let vertical = Layout::vertical([Constraint::Length(popup_height)]).flex(Flex::Center);
             let horizontal =
                 Layout::horizontal([Constraint::Length(popup_width)]).flex(Flex::Center);
             let [popup_area] = vertical.areas(area);
             let [popup_area] = horizontal.areas(popup_area);
 
-            Clear.render(popup_area, buf);
-
             let block = Block::default()
                 .title(prompt.label.clone())
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(Color::Cyan));
             let inner = block.inner(popup_area);
-            block.render(popup_area, buf);
 
-            TextPrompt::new(Cow::Borrowed("")).draw(frame, inner, &mut prompt.text_state);
+            let [prompt_area, rest_area] =
+                Layout::vertical([Constraint::Length(prompt_input_height), Constraint::Fill(1)])
+                    .areas(inner);
+
+            // Buffer-based rendering (buf dropped before TextPrompt::draw)
+            {
+                let buf = frame.buffer_mut();
+                Clear.render(popup_area, buf);
+                block.render(popup_area, buf);
+
+                if !prompt.suggestions.is_empty() {
+                    let [sep_area, list_area] =
+                        Layout::vertical([Constraint::Length(1), Constraint::Fill(1)])
+                            .areas(rest_area);
+
+                    let sep = Line::from("─".repeat(inner_width as usize))
+                        .style(Style::default().fg(Color::DarkGray));
+                    Paragraph::new(sep).render(sep_area, buf);
+
+                    let selected_style = Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::REVERSED);
+                    let dim = Style::default().dim();
+
+                    let suggestion_lines: Vec<Line> = prompt
+                        .suggestions
+                        .iter()
+                        .enumerate()
+                        .skip(prompt.suggestion_scroll)
+                        .take(max_visible)
+                        .map(|(idx, name)| {
+                            let style = if idx == prompt.suggested {
+                                selected_style
+                            } else {
+                                dim
+                            };
+                            Line::styled(format!(" {name}"), style)
+                        })
+                        .collect();
+
+                    Paragraph::new(suggestion_lines).render(list_area, buf);
+                }
+            }
+
+            TextPrompt::new(Cow::Borrowed("")).draw(frame, prompt_area, &mut prompt.text_state);
         }
     }
 
@@ -340,6 +389,86 @@ impl TuiSettingsView {
         self.prompt.is_some()
     }
 
+    pub fn refresh_path_suggestions(&mut self) {
+        let Some(ref mut prompt) = self.prompt else {
+            return;
+        };
+
+        let current = prompt.text_state.value().to_string();
+        if current.is_empty() {
+            prompt.suggestions.clear();
+            return;
+        }
+
+        // Expand tilde
+        let expanded = if current.starts_with('~') {
+            if let Ok(home) = std::env::var("HOME") {
+                current.replacen('~', &home, 1)
+            } else {
+                current.clone()
+            }
+        } else {
+            current.clone()
+        };
+
+        let path = Path::new(&expanded);
+        let (dir, prefix) = if expanded.ends_with('/') {
+            (path.to_path_buf(), String::new())
+        } else {
+            let dir = path
+                .parent()
+                .filter(|p| !p.as_os_str().is_empty())
+                .map(|p| p.to_path_buf())
+                .unwrap_or_else(|| PathBuf::from("."));
+            let prefix = path
+                .file_name()
+                .map(|f| f.to_string_lossy().to_string())
+                .unwrap_or_default();
+            (dir, prefix)
+        };
+
+        let entries = match std::fs::read_dir(&dir) {
+            Ok(entries) => entries.filter_map(|e| e.ok()).collect::<Vec<_>>(),
+            Err(_) => {
+                prompt.suggestions.clear();
+                return;
+            }
+        };
+
+        let mut matches: Vec<String> = entries
+            .iter()
+            .filter_map(|e| {
+                let name = e.file_name().to_string_lossy().to_string();
+                if name.starts_with(&prefix) {
+                    Some(name)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        matches.sort();
+
+        let suggestions: Vec<String> = matches
+            .into_iter()
+            .map(|name| {
+                let full = dir.join(&name);
+                let mut s = full.to_string_lossy().to_string();
+                if full.is_dir() {
+                    s.push('/');
+                }
+                s
+            })
+            .collect();
+
+        if prompt.suggested >= suggestions.len() {
+            prompt.suggested = suggestions.len().saturating_sub(1);
+        }
+        prompt.clamp_suggestion_scroll(MAX_VISIBLE_SUGGESTIONS);
+
+        prompt.suggestions = suggestions;
+    }
+
     pub fn show_keybinds(&self) -> bool {
         self.show_keybinds
     }
@@ -398,7 +527,14 @@ impl TuiSettingsView {
         self.prompt = Some(SettingsPrompt {
             text_state,
             label: self.selected().to_string(),
+            suggestions: Vec::new(),
+            suggested: 0,
+            suggestion_scroll: 0,
         });
+
+        if self.selected().is_path() {
+            self.refresh_path_suggestions();
+        }
     }
 
     fn cmd_from_edit(&mut self, value: String) -> Result<Vec<SettingsCmd>, SettingsCmd> {
