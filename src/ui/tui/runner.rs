@@ -420,20 +420,59 @@ impl TuiRunner {
     }
 
     fn handle_settings_edit(&mut self, event: Event) {
-        if let Event::Key(key) = event
-            && let Some(prompt) = self.settings.prompt_state_mut()
-        {
-            prompt.text_state.handle_key_event(key);
-            self.redraw = true;
+        if let Event::Key(key) = event {
+            let is_path = self.settings.selected().is_path();
 
-            match prompt.text_state.status() {
-                Status::Done => {
-                    log::debug!("value {}", prompt.text_state.value());
-                    dsp!(self, setting, SettingsMsg::SaveEdit);
-                    dsp!(self, setting, SettingsMsg::CancelEditing);
+            if is_path {
+                // Navigation for path fields
+                if let Some(prompt) = self.settings.prompt_state_mut() {
+                    match key.code {
+                        KeyCode::Tab
+                            if let Some(name) =
+                                prompt.suggestions.get(prompt.suggested).cloned() =>
+                        {
+                            *prompt.text_state.value_mut() = name;
+                            let len = prompt.text_state.value().chars().count();
+                            *prompt.text_state.position_mut() = len;
+                            self.settings.refresh_path_suggestions();
+                            self.redraw();
+                            return;
+                        }
+                        KeyCode::Up => {
+                            if prompt.suggested > 0 {
+                                prompt.suggested -= 1;
+                            }
+                            prompt.clamp_suggestion_scroll(MAX_VISIBLE_SUGGESTIONS);
+                            self.redraw();
+                            return;
+                        }
+                        KeyCode::Down => {
+                            if prompt.suggested + 1 < prompt.suggestions.len() {
+                                prompt.suggested += 1;
+                            }
+                            prompt.clamp_suggestion_scroll(MAX_VISIBLE_SUGGESTIONS);
+                            self.redraw();
+                            return;
+                        }
+                        _ => {}
+                    }
                 }
-                Status::Aborted => dsp!(self, setting, SettingsMsg::CancelEditing),
-                _ => {}
+                // refresh after updat
+                self.settings.refresh_path_suggestions();
+            }
+            if let Some(prompt) = self.settings.prompt_state_mut() {
+                prompt.text_state.handle_key_event(key);
+                self.redraw = true;
+
+                match prompt.text_state.status() {
+                    Status::Done => {
+                        log::debug!("value {}", prompt.text_state.value());
+                        dsp!(self, setting, SettingsMsg::SaveEdit);
+                        dsp!(self, setting, SettingsMsg::CancelEditing);
+                    }
+                    Status::Aborted => dsp!(self, setting, SettingsMsg::CancelEditing),
+                    _ => {}
+                }
             }
         }
     }
