@@ -65,7 +65,7 @@ Input → Runner ─┬─→ View.update() → ViewCmd ─→ Core.dispatch(Vie
 - Runner dispatches directly to Core (`PomodoroMsg`, `RouterMsg`) for **business logic**.
 - Views never hold copies of core state — they receive it by reference at render time.
 - Runner reads guard conditions (e.g. `core.overlay()`) directly from Core, not from views.
-- Exclusive dispatch methods (`dispatch_pomo`, `dispatch_timer`, etc.) handle routing and trigger redraws.
+- The `dsp!()` macro (`dsp!(self, pomo/timer/setting/router/core, msg)`) provides typed dispatch wrappers and triggers redraws.
 
 ## Responsibilities
 
