@@ -5,6 +5,7 @@ use crate::config::Hooks;
 use crate::config::Timers;
 use crate::model::Mode;
 use crate::model::Pomodoro;
+use crate::model::Task;
 use crate::ui::prelude::*;
 
 // type IPomodoro = Box<dyn Updateable<PomodoroMsg, PomodoroCmd>>;
@@ -18,16 +19,22 @@ pub enum Msg {
     Router(RouterMsg),
 
     // System messages.
+    /// Try to gracefully quit
     Quit,
+    /// Force quit without quit handling
     ForceQuit,
     /// Emitted by the Runner every 1 second.
     Tick,
 
-    // Views
+    // View intents promoted to core
     ViewTimerCmd(TimerCmd),
     ViewSettingsCmd(SettingsCmd),
 
-    // Effect results (returned by EffectHandler::execute).
+    // Tasks
+    Task(TaskMsg),
+
+    // Effect results for further core handling
+    TaskResult(TaskResultMsg),
     SessionCreated {
         id: i32,
     },
@@ -61,23 +68,15 @@ pub enum Effect {
     StopSound,
     // Notification
     SendNotification(Mode),
-    // Database
-    NewSession {
-        task_id: Option<i32>,
-        mode: Mode,
-    },
-    UpdateSession {
-        id: i32,
-    },
-    EndSession {
-        id: i32,
-    },
+    // Sessions
+    NewSession { task_id: Option<i32>, mode: Mode },
+    UpdateSession { id: i32 },
+    EndSession { id: i32 },
     CloseAllSessions,
+    // Task
+    Task(TaskEffect),
     // Toast
-    ShowToast {
-        message: String,
-        kind: ToastType,
-    },
+    ShowToast { message: String, kind: ToastType },
     // Persistence
     SaveConfig(Box<Config>), // Box, because Config is large.
     RunHook(String),
@@ -90,8 +89,8 @@ pub struct AppCore<E: EffectHandler> {
     router: Router,
     effects: E,
 
-    current_task_id: Option<i32>,
-    active_session_id: Option<i32>,
+    current_task: Option<Task>,
+    active_session: Option<i32>,
     config_snapshot: Config,
     overlay: Option<Overlay>,
     is_quit: bool,
@@ -112,7 +111,7 @@ impl<E: EffectHandler> AppCore<E> {
         config: Config,
         effects: E,
         is_duplicate: bool,
-        initial_task_id: Option<i32>,
+        initial_task: Option<Task>,
     ) -> Self {
         let overlay = if is_duplicate {
             Some(Overlay::DuplicateWarning)
@@ -127,8 +126,8 @@ impl<E: EffectHandler> AppCore<E> {
             config_snapshot: config.clone(),
             config,
 
-            current_task_id: initial_task_id,
-            active_session_id: None,
+            current_task: initial_task,
+            active_session: None,
             overlay,
             is_quit: false,
         }
@@ -218,9 +217,9 @@ impl<E: EffectHandler> Updateable<Msg, Effect> for AppCore<E> {
             Msg::ViewTimerCmd(cmd) => ret.extend(self.translate_timer_cmd(cmd)),
             Msg::ViewSettingsCmd(cmd) => ret.extend(self.translate_settings_cmd(cmd)),
             Msg::Tick => ret.extend(self.handle_tick()),
-            Msg::SessionCreated { id } => self.active_session_id = Some(id),
+            Msg::SessionCreated { id } => self.active_session = Some(id),
             Msg::SessionUpdated => {}
-            Msg::SessionEnded => self.active_session_id = None,
+            Msg::SessionEnded => self.active_session = None,
             Msg::SessionsClosed => {}
             Msg::ConfigSaved(result) => ret.extend(self.handle_config_saved(result)),
             Msg::NotificationSent(_) => {}
@@ -241,6 +240,27 @@ impl<E: EffectHandler> Updateable<Msg, Effect> for AppCore<E> {
             }
             Msg::ResetWarningCancel => self.overlay = None,
             Msg::ResetWarningShow => self.overlay = Some(Overlay::ResetWarning),
+
+            Msg::TaskResult(msg) => match msg {
+                TaskResultMsg::Added(task) => {
+                    self.current_task = Some(task);
+                    ret.push(Effect::ShowToast {
+                        message: "Task created".into(),
+                        kind: ToastType::Success,
+                    });
+                }
+            },
+            Msg::Task(msg) => match msg {
+                TaskMsg::Add { name, description } => {
+                    ret.push(Effect::Task(TaskEffect::Add { name, description }));
+                }
+                TaskMsg::Select(task) => {
+                    self.current_task = Some(task);
+                }
+                TaskMsg::ClearSelection => {
+                    self.current_task = None;
+                }
+            },
         }
         ret
     }
@@ -262,7 +282,7 @@ impl<E: EffectHandler> AppCore<E> {
         let mut ret = vec![];
 
         // Bump the session timestamp on every tick.
-        if let Some(id) = self.active_session_id {
+        if let Some(id) = self.active_session {
             ret.push(Effect::UpdateSession { id });
         }
 
@@ -288,14 +308,14 @@ impl<E: EffectHandler> AppCore<E> {
     }
 
     fn take_active_session_id(&mut self) -> Option<i32> {
-        self.active_session_id.take()
+        self.active_session.take()
     }
 
     fn handle_session_end(&mut self, curr_mode: Mode, next_mode: Mode) -> Vec<Effect> {
         let mut ret = Vec::new();
 
         // End the active session (.take() so only fires once).
-        if let Some(id) = self.active_session_id.take() {
+        if let Some(id) = self.active_session.take() {
             ret.push(Effect::EndSession { id });
         }
 
@@ -355,7 +375,7 @@ impl<E: EffectHandler> AppCore<E> {
         match cmd {
             PomodoroCmd::Started(mode) => {
                 ret.push(Effect::NewSession {
-                    task_id: self.current_task_id,
+                    task_id: self.current_task.as_ref().map(|t| t.id),
                     mode,
                 });
             }
@@ -368,7 +388,7 @@ impl<E: EffectHandler> AppCore<E> {
             }
             PomodoroCmd::NextSession(mode) => {
                 ret.push(Effect::NewSession {
-                    task_id: self.current_task_id,
+                    task_id: self.current_task.as_ref().map(|t| t.id),
                     mode,
                 });
             }
@@ -379,7 +399,7 @@ impl<E: EffectHandler> AppCore<E> {
             }
             PomodoroCmd::SessionResumed(mode) => {
                 ret.push(Effect::NewSession {
-                    task_id: self.current_task_id,
+                    task_id: self.current_task.as_ref().map(|t| t.id),
                     mode,
                 });
             }
@@ -388,7 +408,7 @@ impl<E: EffectHandler> AppCore<E> {
                     ret.push(Effect::EndSession { id });
                 }
                 ret.push(Effect::NewSession {
-                    task_id: self.current_task_id,
+                    task_id: self.current_task.as_ref().map(|t| t.id),
                     mode,
                 });
             }

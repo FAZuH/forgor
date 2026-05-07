@@ -8,6 +8,7 @@ use tomo::config::Config;
 use tomo::error::AppError;
 use tomo::log::setup_logging;
 use tomo::model::Pomodoro;
+use tomo::model::Task;
 use tomo::repo::Repos;
 use tomo::service::DesktopNotifyService;
 use tomo::service::NotifyService;
@@ -43,8 +44,7 @@ fn main() -> Result<(), AppError> {
     let initial_task = cli.task.clone().map(|name| {
         repo.task()
             .find_by_name(name.clone())
-            .map(|t| t.id)
-            .unwrap_or_else(|_| repo.task().add(name, None).unwrap().id)
+            .unwrap_or_else(|_| repo.task().add(name, None).unwrap())
     });
 
     // services
@@ -77,14 +77,14 @@ fn view(
     notify: Notify,
     pomo: Pomodoro,
     is_duplicate: bool,
-    initial_task_id: Option<i32>,
+    initial_task: Option<Task>,
 ) -> View {
     use tomo::ui::core::AppCore;
     use tomo::ui::tui::TuiEffectHandler;
     use tomo::ui::tui::TuiRunner;
 
     let effect = TuiEffectHandler::new(sound, notify, repo);
-    let core = AppCore::new(pomo, conf, effect, is_duplicate, initial_task_id);
+    let core = AppCore::new(pomo, conf, effect, is_duplicate, initial_task);
 
     Box::new(TuiRunner::new(core).unwrap())
 }

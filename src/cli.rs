@@ -19,7 +19,11 @@ pub struct Cli {
     #[arg(short = 'L', long, value_parser = |a: &str| a.parse::<u32>(), help = "Number of focus sessions before a long break")]
     pub long_interval: Option<u32>,
 
-    #[arg(short, long, help = "Start tracking a task by name (created if not exists)")]
+    #[arg(
+        short,
+        long,
+        help = "Start tracking a task by name (created if not exists)"
+    )]
     pub task: Option<String>,
 
     #[arg(short, long, help = "Path to config directory")]

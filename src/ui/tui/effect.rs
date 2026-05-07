@@ -83,6 +83,17 @@ impl EffectHandler for TuiEffectHandler {
             Effect::Quit => {
                 let _ = self.sound.stop();
             }
+            Effect::Task(msg) => match msg {
+                TaskEffect::Add { name, description } => {
+                    match self.repo.task().add(name, description) {
+                        Ok(task) => ret.push(Msg::TaskResult(TaskResultMsg::Added(task))),
+                        Err(e) => ret.extend(self.execute(Effect::ShowToast {
+                            message: format!("Error when creating task: {e}"),
+                            kind: ToastType::Error,
+                        })),
+                    }
+                }
+            },
         }
         ret
     }
