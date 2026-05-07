@@ -80,8 +80,12 @@ impl TuiRunner {
                     Page::Timer => {
                         let is_prompting_transition =
                             self.core.overlay() == Some(Overlay::PromptingTransition);
-                        self.timer
-                            .render(f, self.core.pomodoro(), is_prompting_transition)
+                        self.timer.render(
+                            f,
+                            self.core.pomodoro(),
+                            is_prompting_transition,
+                            self.core.current_task(),
+                        )
                     }
                     Page::Settings => {
                         let is_config_dirty = self.core.is_config_dirty();

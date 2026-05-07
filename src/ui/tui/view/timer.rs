@@ -12,6 +12,7 @@ use tui_widgets::popup::Popup;
 
 use crate::model::Mode;
 use crate::model::Pomodoro;
+use crate::model::Task;
 use crate::ui::prelude::*;
 use crate::utils;
 
@@ -27,7 +28,13 @@ impl TuiTimerView {
         }
     }
 
-    pub fn render(&self, canvas: &mut Frame, state: &Pomodoro, is_prompting_transition: bool) {
+    pub fn render(
+        &self,
+        canvas: &mut Frame,
+        state: &Pomodoro,
+        is_prompting_transition: bool,
+        current_task: Option<&Task>,
+    ) {
         let area = canvas.area();
         let buf = canvas.buffer_mut();
 
@@ -45,7 +52,11 @@ impl TuiTimerView {
         self.timer(rows[5], buf, &remaining, mode);
         self.progress_bar(rows[6], buf, progress, mode);
         self.stats(rows[8], buf, state);
-        self.keybinds(rows[10], buf, show_binds);
+        if let Some(task) = current_task {
+            self.task(rows[10], buf, task);
+        }
+        self.keybinds(rows[12], buf, show_binds);
+
         self.prompt(area, buf, state, is_prompting_transition);
     }
 }
@@ -187,6 +198,17 @@ impl TuiTimerView {
             .render(area, buf);
     }
 
+    fn task(&self, area: Rect, buf: &mut Buffer, state: &Task) {
+        let line = Line::from(vec![
+            Span::styled("Current task: ", Style::default().dim()),
+            Span::styled(&state.name, Style::default()),
+        ]);
+
+        Paragraph::new(line)
+            .alignment(Alignment::Center)
+            .render(area, buf);
+    }
+
     fn keybinds(&self, area: Rect, buf: &mut Buffer, show: bool) {
         if show {
             KEYBINDS_ON.clone().render(area, buf);
@@ -222,6 +244,8 @@ static LAYOUT: LazyLock<Layout> = LazyLock::new(|| {
         Constraint::Length(1), // progress_bar
         Constraint::Length(1),
         Constraint::Length(1), // stats
+        Constraint::Length(1),
+        Constraint::Length(1), // task
         Constraint::Length(1),
         Constraint::Length(3), // keybinds
         Constraint::Fill(1),

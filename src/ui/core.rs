@@ -168,6 +168,12 @@ impl<E: EffectHandler> AppCore<E> {
         &mut self.effects
     }
 
+    // -- State getters --
+
+    pub fn current_task(&self) -> Option<&Task> {
+        self.current_task.as_ref()
+    }
+
     pub fn is_config_dirty(&self) -> bool {
         self.config != self.config_snapshot
     }
