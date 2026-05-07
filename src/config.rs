@@ -13,7 +13,9 @@ use crate::utils;
 #[serde(default)]
 pub struct Config {
     pub pomodoro: PomodoroConfig,
+    #[serde(skip)]
     pub logs_path: PathBuf,
+    #[serde(skip)]
     pub db_path: PathBuf,
     #[serde(skip)]
     pub conf_path: PathBuf,
@@ -52,23 +54,16 @@ impl Config {
             info!("created config directory at {conf_dir:?}");
         }
 
-        let config = if !conf_path.exists() {
-            let config = Config::default();
+        if !conf_path.exists() {
             let file = fs::File::create(conf_path)?;
-            serde_norway::to_writer(&file, &config)?;
+            serde_norway::to_writer(&file, &self)?;
             info!("written default config to {:?}", conf_path);
-            config
         } else {
             let file = fs::File::open(conf_path)?;
-            let config = serde_norway::from_reader(&file)?;
+            let config: Config = serde_norway::from_reader(&file)?;
             info!("loaded configuration");
-            config
+            self.pomodoro = config.pomodoro;
         };
-        let conf_dir = self.conf_dir.clone();
-        let conf_path = self.conf_path.clone();
-        *self = config;
-        self.conf_dir = conf_dir;
-        self.conf_path = conf_path;
         Ok(())
     }
 
