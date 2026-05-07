@@ -89,6 +89,8 @@ impl Updateable<PomodoroMsg, PomodoroCmd> for Pomodoro {
 pub enum TimerMsg {
     SetShowKeybinds(bool),
     ToggleShowKeybinds,
+    StartTaskPrompt,
+    CancelTaskPrompt,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

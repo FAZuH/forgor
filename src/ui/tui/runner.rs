@@ -18,6 +18,7 @@ use crate::ui::tui::TuiError;
 use crate::ui::tui::backend::Tui;
 use crate::ui::tui::view::*;
 use crate::ui::update::PomodoroMsg;
+use crate::ui::update::TaskMsg;
 
 /// The terminal UI implementation of the application runner using Crossterm and Ratatui.
 pub struct TuiRunner {
@@ -270,6 +271,10 @@ impl TuiRunner {
     }
 
     fn handle_timer(&mut self, event: Event) {
+        if self.timer.is_editing() {
+            return self.handle_timer_edit(event);
+        }
+
         if self.core.overlay() == Some(Overlay::PromptingTransition) {
             return self.handle_timer_transition(event);
         }
@@ -286,6 +291,7 @@ impl TuiRunner {
                 K::Enter => self.dispatch_pomo(SkipSession),
                 K::Backspace => self.dispatch_core(Msg::ResetWarningShow),
                 K::Char('s') => self.dispatch_router(RouterMsg::GoTo(Page::Settings)),
+                K::Char('t') => self.dispatch_timer(TimerMsg::StartTaskPrompt),
                 K::Char('/') | K::Char('?') => self.dispatch_timer(TimerMsg::ToggleShowKeybinds),
                 _ => {}
             }
@@ -302,6 +308,29 @@ impl TuiRunner {
                 K::Esc | K::Char('n') => {
                     self.dispatch_core(Msg::ViewTimerCmd(TimerCmd::PromptTransitionAnsweredNo))
                 }
+                _ => {}
+            }
+        }
+    }
+
+    fn handle_timer_edit(&mut self, event: Event) {
+        if let Event::Key(key) = event
+            && let Some(prompt) = self.timer.prompt_state_mut()
+        {
+            prompt.text_state.handle_key_event(key);
+            self.redraw = true;
+
+            match prompt.text_state.status() {
+                Status::Done => {
+                    let name = prompt.text_state.value().to_string();
+                    log::debug!("task name: {}", name);
+                    self.dispatch_timer(TimerMsg::CancelTaskPrompt);
+                    self.dispatch_core(Msg::Task(TaskMsg::Add {
+                        name,
+                        description: None,
+                    }));
+                }
+                Status::Aborted => self.dispatch_timer(TimerMsg::CancelTaskPrompt),
                 _ => {}
             }
         }

@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::LazyLock;
 use std::time::Duration;
@@ -6,9 +7,16 @@ use std::time::Instant;
 use ratatui::layout::Flex;
 use ratatui::prelude::*;
 use ratatui::symbols::border;
+use ratatui::widgets::Block;
+use ratatui::widgets::Borders;
+use ratatui::widgets::Clear;
 use ratatui::widgets::Gauge;
 use ratatui::widgets::Paragraph;
 use tui_widgets::popup::Popup;
+use tui_widgets::prompts::FocusState;
+use tui_widgets::prompts::State;
+use tui_widgets::prompts::TextState;
+use tui_widgets::prompts::prelude::*;
 
 use crate::model::Mode;
 use crate::model::Pomodoro;
@@ -19,17 +27,23 @@ use crate::utils;
 /// Renders the Pomodoro timer interface and manages view-local state.
 pub struct TuiTimerView {
     show_keybinds: bool,
+    prompt: Option<TimerPrompt>,
+}
+
+pub struct TimerPrompt {
+    pub text_state: TextState<'static>,
 }
 
 impl TuiTimerView {
     pub fn new() -> Self {
         Self {
             show_keybinds: false,
+            prompt: None,
         }
     }
 
     pub fn render(
-        &self,
+        &mut self,
         canvas: &mut Frame,
         state: &Pomodoro,
         is_prompting_transition: bool,
@@ -57,13 +71,20 @@ impl TuiTimerView {
         }
         self.keybinds(rows[12], buf, show_binds);
 
-        self.prompt(area, buf, state, is_prompting_transition);
+        self.prompt_transition(area, buf, state, is_prompting_transition);
+        self.prompt_task(canvas, area);
     }
 }
 
 impl TuiTimerView {
     // Render popup if prompt is active
-    fn prompt(&self, area: Rect, buf: &mut Buffer, pomo: &Pomodoro, is_prompting_transition: bool) {
+    fn prompt_transition(
+        &self,
+        area: Rect,
+        buf: &mut Buffer,
+        pomo: &Pomodoro,
+        is_prompting_transition: bool,
+    ) {
         if is_prompting_transition {
             let next = pomo.next_mode().to_string().to_lowercase();
             let body = Text::from(vec![
@@ -99,6 +120,34 @@ impl TuiTimerView {
                 area,
                 buf,
             );
+        }
+    }
+
+    fn prompt_task(&mut self, frame: &mut Frame, area: Rect) {
+        if let Some(ref mut prompt) = self.prompt {
+            let buf = frame.buffer_mut();
+            let popup_width = 40.min(area.width.saturating_sub(4));
+            let inner_width = popup_width.saturating_sub(2).max(1);
+            let text_len = prompt.text_state.value().chars().count() as u16;
+            let prefix_len = 5;
+            let lines_needed = (text_len + prefix_len) / inner_width + 1;
+            let popup_height = (lines_needed + 2).max(3).min(area.height);
+            let vertical = Layout::vertical([Constraint::Length(popup_height)]).flex(Flex::Center);
+            let horizontal =
+                Layout::horizontal([Constraint::Length(popup_width)]).flex(Flex::Center);
+            let [popup_area] = vertical.areas(area);
+            let [popup_area] = horizontal.areas(popup_area);
+
+            Clear.render(popup_area, buf);
+
+            let block = Block::default()
+                .title(" New task ")
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(Color::Cyan));
+            let inner = block.inner(popup_area);
+            block.render(popup_area, buf);
+
+            TextPrompt::new(Cow::Borrowed("")).draw(frame, inner, &mut prompt.text_state);
         }
     }
 
@@ -309,6 +358,9 @@ static KEYBINDS_ON: LazyLock<Paragraph<'static>> = LazyLock::new(|| {
             Span::styled("s", bright),
             Span::styled(": Settings", dim),
             sep.clone(),
+            Span::styled("t", bright),
+            Span::styled(": Add task", dim),
+            sep.clone(),
             Span::styled("?", bright),
             Span::styled(": Disable Help", dim),
         ]),
@@ -333,6 +385,13 @@ impl Updateable<TimerMsg, TimerCmd> for TuiTimerView {
                 let new = !self.show_keybinds;
                 self.update(TimerMsg::SetShowKeybinds(new));
             }
+            StartTaskPrompt => {
+                let text_state = TextState::new().with_focus(FocusState::Focused);
+                self.prompt = Some(TimerPrompt { text_state });
+            }
+            CancelTaskPrompt => {
+                self.prompt = None;
+            }
         }
 
         ret
@@ -342,5 +401,13 @@ impl Updateable<TimerMsg, TimerCmd> for TuiTimerView {
 impl TuiTimerView {
     pub fn show_keybinds(&self) -> bool {
         self.show_keybinds
+    }
+
+    pub fn is_editing(&self) -> bool {
+        self.prompt.is_some()
+    }
+
+    pub fn prompt_state_mut(&mut self) -> Option<&mut TimerPrompt> {
+        self.prompt.as_mut()
     }
 }
