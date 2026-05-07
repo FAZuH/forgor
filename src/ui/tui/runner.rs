@@ -9,7 +9,7 @@ use tui_widgets::prompts::State;
 use tui_widgets::prompts::Status;
 
 use crate::ui::UiError;
-use crate::ui::core::Cmd;
+use crate::ui::core::Effect;
 use crate::ui::core::Msg;
 use crate::ui::core::Overlay;
 use crate::ui::prelude::*;
@@ -18,6 +18,7 @@ use crate::ui::tui::TuiError;
 use crate::ui::tui::backend::Tui;
 use crate::ui::tui::view::*;
 use crate::ui::update::PomodoroMsg;
+use crate::ui::update::TaskMsg;
 
 /// The terminal UI implementation of the application runner using Crossterm and Ratatui.
 pub struct TuiRunner {
@@ -80,8 +81,12 @@ impl TuiRunner {
                     Page::Timer => {
                         let is_prompting_transition =
                             self.core.overlay() == Some(Overlay::PromptingTransition);
-                        self.timer
-                            .render(f, self.core.pomodoro(), is_prompting_transition)
+                        self.timer.render(
+                            f,
+                            self.core.pomodoro(),
+                            is_prompting_transition,
+                            self.core.current_task(),
+                        )
                     }
                     Page::Settings => {
                         let is_config_dirty = self.core.is_config_dirty();
@@ -208,7 +213,7 @@ impl TuiRunner {
     fn common_handler(&mut self, event: &Event) {
         match event {
             Event::Key(key) => match key.code {
-                KeyCode::Char('m') => self.core.execute_effect(Cmd::StopSound),
+                KeyCode::Char('m') => self.core.execute_effect(Effect::StopSound),
                 KeyCode::Char('q') => self.dispatch_core(Msg::Quit),
                 _ => {}
             },
@@ -266,6 +271,10 @@ impl TuiRunner {
     }
 
     fn handle_timer(&mut self, event: Event) {
+        if self.timer.is_editing() {
+            return self.handle_timer_edit(event);
+        }
+
         if self.core.overlay() == Some(Overlay::PromptingTransition) {
             return self.handle_timer_transition(event);
         }
@@ -282,6 +291,7 @@ impl TuiRunner {
                 K::Enter => self.dispatch_pomo(SkipSession),
                 K::Backspace => self.dispatch_core(Msg::ResetWarningShow),
                 K::Char('s') => self.dispatch_router(RouterMsg::GoTo(Page::Settings)),
+                K::Char('t') => self.dispatch_timer(TimerMsg::StartTaskPrompt),
                 K::Char('/') | K::Char('?') => self.dispatch_timer(TimerMsg::ToggleShowKeybinds),
                 _ => {}
             }
@@ -298,6 +308,82 @@ impl TuiRunner {
                 K::Esc | K::Char('n') => {
                     self.dispatch_core(Msg::ViewTimerCmd(TimerCmd::PromptTransitionAnsweredNo))
                 }
+                _ => {}
+            }
+        }
+    }
+
+    fn handle_timer_edit(&mut self, event: Event) {
+        if let Event::Key(key) = event
+            && let Some(prompt) = self.timer.prompt_state_mut()
+        {
+            match key.code {
+                KeyCode::Up | KeyCode::BackTab => {
+                    if prompt.selected > 0 {
+                        prompt.selected -= 1;
+                    }
+                    if let Some(task) = prompt.suggestions.get(prompt.selected) {
+                        *prompt.text_state.value_mut() = task.name.clone();
+                        let len = prompt.text_state.value().chars().count();
+                        *prompt.text_state.position_mut() = len;
+                    }
+                    self.redraw = true;
+                    return;
+                }
+                KeyCode::Down | KeyCode::Tab => {
+                    if prompt.selected + 1 < prompt.suggestions.len() {
+                        prompt.selected += 1;
+                    }
+                    if let Some(task) = prompt.suggestions.get(prompt.selected) {
+                        *prompt.text_state.value_mut() = task.name.clone();
+                        let len = prompt.text_state.value().chars().count();
+                        *prompt.text_state.position_mut() = len;
+                    }
+                    self.redraw = true;
+                    return;
+                }
+                KeyCode::Enter => {
+                    if let Some(task) = prompt.suggestions.get(prompt.selected) {
+                        let task = task.clone();
+                        self.dispatch_timer(TimerMsg::CancelTaskPrompt);
+                        self.dispatch_core(Msg::Task(TaskMsg::Select(task)));
+                        return;
+                    }
+                }
+                _ => {}
+            }
+
+            prompt.text_state.handle_key_event(key);
+            self.redraw = true;
+
+            if let Some(tasks) = self.core.task_suggestions() {
+                let value = prompt.text_state.value();
+                let prefix = value.to_lowercase();
+                prompt.suggestions = if prefix.is_empty() {
+                    Vec::new()
+                } else {
+                    tasks
+                        .iter()
+                        .filter(|t| t.name.to_lowercase().starts_with(&prefix))
+                        .cloned()
+                        .collect()
+                };
+                if prompt.selected >= prompt.suggestions.len() {
+                    prompt.selected = prompt.suggestions.len().saturating_sub(1);
+                }
+            }
+
+            match prompt.text_state.status() {
+                Status::Done => {
+                    let name = prompt.text_state.value().to_string();
+                    log::debug!("task name: {}", name);
+                    self.dispatch_timer(TimerMsg::CancelTaskPrompt);
+                    self.dispatch_core(Msg::Task(TaskMsg::Add {
+                        name,
+                        description: None,
+                    }));
+                }
+                Status::Aborted => self.dispatch_timer(TimerMsg::CancelTaskPrompt),
                 _ => {}
             }
         }
