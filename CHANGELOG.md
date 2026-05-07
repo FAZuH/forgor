@@ -1,3 +1,19 @@
+## 0.2.7 (2026-05-07)
+
+
+### New Features
+
+* Add -t/--task argument to set initial task ([a789074](https://github.com/FAZuH/tomo/commit/a789074165449dae9b72827e3a8b484314f89341)), closes [#51](https://github.com/FAZuH/tomo/issues/51)
+* Add CLI argument help ([67854fc](https://github.com/FAZuH/tomo/commit/67854fc37587a4e407e3227196857c74e855810c))
+* Add prompt to set tracked task in timer view ([78ae914](https://github.com/FAZuH/tomo/commit/78ae914d8d4c35c49e20ce122aee274d94b63326)), closes [#54](https://github.com/FAZuH/tomo/issues/54)
+* Add task autocompletion to task change prompt ([145924b](https://github.com/FAZuH/tomo/commit/145924b24421a6fcbd02b6f2e7dd71fa1d25f7b5)), closes [#52](https://github.com/FAZuH/tomo/issues/52)
+* Display currently tracked task in timer view ([78faadd](https://github.com/FAZuH/tomo/commit/78faadd1d35e9d9d2e89ad7d3e3e00c41bf9c5d1)), closes [#53](https://github.com/FAZuH/tomo/issues/53)
+
+
+### Bug Fixes
+
+* -c/--config-path not working properly ([ad036f2](https://github.com/FAZuH/tomo/commit/ad036f29797de6623622daef5bd05b7604b1dbc0))
+
 ## 0.2.6 (2026-05-06)
 
 
@@ -68,16 +84,4 @@
 
 * Fix alarm path change not taking effect without restart ([accd464](https://github.com/FAZuH/tomo/commit/accd464b1edee8bd66d43dd118e1389af29fb274))
 * Timer keybind help symbols not rendering properly on Windows ([7b95e1c](https://github.com/FAZuH/tomo/commit/7b95e1c630fd07065d55a2481265e6b9cab2a2ac))
-
-## 0.2.2 (2026-05-01)
-
-
-### Bug Fixes
-
-* Duplicate input on Windows command prompt ([f34a18e](https://github.com/FAZuH/tomo/commit/f34a18e5dcd0db09122c0cdea528c5fc6cdcf629))
-
-
-### Performance Improvements
-
-* Improve initial draw speed ([99c9bc5](https://github.com/FAZuH/tomo/commit/99c9bc5e7e3858a36bf1c0150ecff9636a5adea0))
 
