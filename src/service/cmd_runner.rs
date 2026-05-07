@@ -21,3 +21,25 @@ pub fn run_hook_command(cmd: &str) {
         }
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cmd_empty_string() {
+        // Should not panic on empty command
+        run_hook_command("");
+    }
+
+    #[test]
+    fn cmd_whitespace() {
+        run_hook_command("   ");
+    }
+
+    #[test]
+    fn cmd_malformed_shlex() {
+        // Unmatched quote should be handled gracefully (via shlex split returning None)
+        run_hook_command("echo \"unmatched");
+    }
+}

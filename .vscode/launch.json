@@ -1,0 +1,24 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "codelldb",
+            "request": "launch",
+            "name": "Debug 'tomo'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=tomo",
+                    "--package=tomo"
+                ],
+                "filter": {
+                    "name": "tomo",
+                    "kind": "bin"
+                }
+            },
+            "args": ["--config-path=./data"],
+            "cwd": "${workspaceFolder}",
+            "program": "${workspaceFolder}/target/debug/tomo"
+        }
+    ]
+}

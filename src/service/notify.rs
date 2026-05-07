@@ -26,3 +26,29 @@ impl NotifyService for DesktopNotifyService {
         notification.show().map(|_| ()).map_err(|e| e.to_string())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn notification_from_focus() {
+        let n = Notification::from(Mode::Focus);
+        assert_eq!(n.summary, "Time to focus!");
+        assert!(n.body.contains("Get back to work"));
+    }
+
+    #[test]
+    fn notification_from_short_break() {
+        let n = Notification::from(Mode::ShortBreak);
+        assert_eq!(n.summary, "Short break time!");
+        assert!(n.body.contains("breather"));
+    }
+
+    #[test]
+    fn notification_from_long_break() {
+        let n = Notification::from(Mode::LongBreak);
+        assert_eq!(n.summary, "Long break time!");
+        assert!(n.body.contains("earned it"));
+    }
+}

@@ -1,17 +1,16 @@
-use crate::cli::CliArgumentError;
 use crate::config::ConfigError;
 use crate::ui::UiError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
-    #[error(transparent)]
-    Cli(#[from] CliArgumentError),
+    #[error("invalid argument: {0}")]
+    CliError(String),
 
     #[error("Configuration error: {0}")]
     ConfigError(String),
 
     #[error(transparent)]
-    Ui(#[from] UiError),
+    UiError(#[from] UiError),
 
     #[error("Invalid state: {0}")]
     InvalidState(String),

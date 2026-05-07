@@ -26,45 +26,69 @@ pub enum ConfigMsg {
     #[strum(
         message = "Focus",
         detailed_message = "Focus Duration",
-        props(description = "Duration of the main focus session in minutes.")
+        props(
+            description = "Duration of the main focus session in minutes.",
+            type = "duration"
+        )
     )]
     TimerFocus(Duration),
     #[strum(
         message = "Short Break",
         detailed_message = "Short Break Duration",
-        props(description = "Duration of a short break in minutes.")
+        props(
+            description = "Duration of a short break in minutes.",
+            type = "duration"
+        )
     )]
     TimerShort(Duration),
     #[strum(
         message = "Long Break",
         detailed_message = "Long Break Duration",
-        props(description = "Duration of a long break in minutes.")
+        props(
+            description = "Duration of a long break in minutes.",
+            type = "duration"
+        )
     )]
     TimerLong(Duration),
     #[strum(
         message = "Long Break Interval",
         detailed_message = "Long Break Interval",
-        props(description = "Number of focus sessions before a long break.")
+        props(
+            description = "Number of focus sessions before a long break.",
+            type = "number"
+        )
     )]
     TimerLongInterval(u32),
     #[strum(
         message = "Auto-start on Launch",
-        props(description = "Automatically start the timer when the application launches.")
+        props(
+            description = "Automatically start the timer when the application launches.",
+            type = "toggle"
+        )
     )]
     AutoStartOnLaunch,
     #[strum(
         message = "Focus",
-        props(description = "Automatically start the next focus session after a break.")
+        props(
+            description = "Automatically start the next focus session after a break.",
+            type = "toggle"
+        )
     )]
     TimerAutoFocus,
     #[strum(
         message = "Short Break",
-        props(description = "Automatically start a short break after a focus session.")
+        props(
+            description = "Automatically start a short break after a focus session.",
+            type = "toggle"
+        )
     )]
     TimerAutoShort,
     #[strum(
         message = "Long Break",
-        props(description = "Automatically start a long break when the interval is reached.")
+        props(
+            description = "Automatically start a long break when the interval is reached.",
+            type = "toggle"
+        )
     )]
     TimerAutoLong,
 
@@ -72,19 +96,28 @@ pub enum ConfigMsg {
     #[strum(
         message = "Focus",
         detailed_message = "Focus Hook Command",
-        props(description = "Shell command to execute when a focus session starts.")
+        props(
+            description = "Shell command to execute when a focus session starts.",
+            type = "string"
+        )
     )]
     HookFocus(String),
     #[strum(
         message = "Short Break",
         detailed_message = "Short Break Hook Command",
-        props(description = "Shell command to execute when a short break starts.")
+        props(
+            description = "Shell command to execute when a short break starts.",
+            type = "string"
+        )
     )]
     HookShort(String),
     #[strum(
         message = "Long Break",
         detailed_message = "Long Break Hook Command",
-        props(description = "Shell command to execute when a long break starts.")
+        props(
+            description = "Shell command to execute when a long break starts.",
+            type = "string"
+        )
     )]
     HookLong(String),
 
@@ -92,37 +125,55 @@ pub enum ConfigMsg {
     #[strum(
         message = "Focus",
         detailed_message = "Focus Alarm Sound File Path",
-        props(description = "Path to the audio file played when a focus session ends.")
+        props(
+            description = "Path to the audio file played when a focus session ends.",
+            type = "path"
+        )
     )]
     AlarmPathFocus(Option<PathBuf>),
     #[strum(
         message = "Short Break",
         detailed_message = "Short Break Alarm Sound File Path",
-        props(description = "Path to the audio file played when a short break ends.")
+        props(
+            description = "Path to the audio file played when a short break ends.",
+            type = "path"
+        )
     )]
     AlarmPathShort(Option<PathBuf>),
     #[strum(
         message = "Long Break",
         detailed_message = "Long Break Alarm Sound File Path",
-        props(description = "Path to the audio file played when a long break ends.")
+        props(
+            description = "Path to the audio file played when a long break ends.",
+            type = "path"
+        )
     )]
     AlarmPathLong(Option<PathBuf>),
     #[strum(
         message = "Focus",
         detailed_message = "Focus Alarm Volume",
-        props(description = "Volume level (0-100) for the focus alarm.")
+        props(
+            description = "Volume level (0-100) for the focus alarm.",
+            type = "percentage"
+        )
     )]
     AlarmVolumeFocus(Percentage),
     #[strum(
         message = "Short Break",
         detailed_message = "Short Break Alarm Volume",
-        props(description = "Volume level (0-100) for the short break alarm.")
+        props(
+            description = "Volume level (0-100) for the short break alarm.",
+            type = "percentage"
+        )
     )]
     AlarmVolumeShort(Percentage),
     #[strum(
         message = "Long Break",
         detailed_message = "Long Break Alarm Volume",
-        props(description = "Volume level (0-100) for the long break alarm.")
+        props(
+            description = "Volume level (0-100) for the long break alarm.",
+            type = "percentage"
+        )
     )]
     AlarmVolumeLong(Percentage),
 }
@@ -223,35 +274,15 @@ impl SettingsItem {
     }
 
     pub fn is_toggle(&self) -> bool {
-        Self::toggles().contains(self)
+        self.config_msg().get_str("type") == Some("toggle")
     }
 
     pub fn is_percentage(&self) -> bool {
-        Self::percentages().contains(self)
+        self.config_msg().get_str("type") == Some("percentage")
     }
 
     pub fn is_path(&self) -> bool {
-        self.paths().contains(self)
-    }
-
-    pub fn paths(&self) -> Vec<Self> {
-        use SettingsItem::*;
-        vec![AlarmPathFocus, AlarmPathLong, AlarmPathShort]
-    }
-
-    fn toggles() -> Vec<Self> {
-        use SettingsItem::*;
-        vec![
-            TimerAutoFocus,
-            TimerAutoShort,
-            TimerAutoLong,
-            AutoStartOnLaunch,
-        ]
-    }
-
-    fn percentages() -> Vec<Self> {
-        use SettingsItem::*;
-        vec![AlarmVolumeFocus, AlarmVolumeLong, AlarmVolumeShort]
+        self.config_msg().get_str("type") == Some("path")
     }
 }
 
@@ -314,7 +345,7 @@ impl SettingsSection {
         use SettingsItem::*;
         match self {
             SettingsSection::Timer => {
-                &SettingsItem::VARIANTS[AutoStartOnLaunch as usize..=TimerAutoLong as usize]
+                &SettingsItem::VARIANTS[TimerFocus as usize..=TimerAutoLong as usize]
             }
             SettingsSection::Hook => {
                 &SettingsItem::VARIANTS[HookFocus as usize..=HookLong as usize]
@@ -341,7 +372,10 @@ pub enum ToastType {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use super::*;
+
     #[test]
     fn settings_item_props() {
         assert_eq!(SettingsItem::TimerFocus.label(), "Focus");
@@ -349,6 +383,166 @@ mod tests {
         assert_eq!(
             SettingsItem::TimerFocus.description(),
             "Duration of the main focus session in minutes."
+        );
+    }
+
+    #[test]
+    fn item_toggle() {
+        assert!(SettingsItem::AutoStartOnLaunch.is_toggle());
+        assert!(SettingsItem::TimerAutoFocus.is_toggle());
+        assert!(!SettingsItem::TimerFocus.is_toggle());
+    }
+
+    #[test]
+    fn item_percentage() {
+        assert!(SettingsItem::AlarmVolumeFocus.is_percentage());
+        assert!(SettingsItem::AlarmVolumeShort.is_percentage());
+        assert!(!SettingsItem::TimerFocus.is_percentage());
+    }
+
+    #[test]
+    fn item_path() {
+        assert!(SettingsItem::AlarmPathFocus.is_path());
+        assert!(SettingsItem::AlarmPathLong.is_path());
+        assert!(!SettingsItem::TimerFocus.is_path());
+    }
+
+    #[test]
+    fn item_index_roundtrip() {
+        assert_eq!(
+            SettingsItem::from_index(SettingsItem::TimerFocus.index()),
+            Some(SettingsItem::TimerFocus)
+        );
+        assert_eq!(
+            SettingsItem::from_index(SettingsItem::AlarmVolumeLong.index()),
+            Some(SettingsItem::AlarmVolumeLong)
+        );
+    }
+
+    #[test]
+    fn item_section() {
+        assert_eq!(SettingsItem::TimerFocus.section(), SettingsSection::Timer);
+        assert_eq!(SettingsItem::HookFocus.section(), SettingsSection::Hook);
+        assert_eq!(
+            SettingsItem::AlarmPathFocus.section(),
+            SettingsSection::Alarm
+        );
+    }
+
+    #[test]
+    fn item_display() {
+        assert_eq!(SettingsItem::TimerFocus.to_string(), "Focus Duration");
+    }
+
+    #[test]
+    fn config_msg_display() {
+        assert_eq!(
+            ConfigMsg::TimerFocus(Duration::from_secs(60)).to_string(),
+            "Focus Duration"
+        );
+    }
+
+    #[test]
+    fn section_from_item() {
+        assert_eq!(
+            SettingsSection::from_item(SettingsItem::TimerShort),
+            SettingsSection::Timer
+        );
+        assert_eq!(
+            SettingsSection::from_item(SettingsItem::HookLong),
+            SettingsSection::Hook
+        );
+    }
+
+    #[test]
+    fn section_item_begin_idx() {
+        assert_eq!(
+            SettingsSection::Timer.item_begin_idx(),
+            SettingsItem::TimerFocus.index()
+        );
+        assert_eq!(
+            SettingsSection::Hook.item_begin_idx(),
+            SettingsItem::HookFocus.index()
+        );
+        assert_eq!(
+            SettingsSection::Alarm.item_begin_idx(),
+            SettingsItem::AlarmPathFocus.index()
+        );
+    }
+
+    #[test]
+    fn section_label() {
+        assert_eq!(SettingsSection::Timer.label(), "Timer");
+        assert_eq!(SettingsSection::Hook.label(), "Hook");
+        assert_eq!(SettingsSection::Alarm.label(), "Alarm");
+    }
+
+    #[test]
+    fn section_items_length() {
+        assert_eq!(SettingsSection::Timer.items().len(), 8);
+        assert_eq!(SettingsSection::Hook.items().len(), 3);
+        assert_eq!(SettingsSection::Alarm.items().len(), 6);
+    }
+
+    #[test]
+    fn config_update_toggle() {
+        let mut config = Config::default();
+        let auto_start = config.pomodoro.timer.auto_start_on_launch;
+
+        config.update(ConfigMsg::AutoStartOnLaunch);
+
+        assert_ne!(config.pomodoro.timer.auto_start_on_launch, auto_start);
+    }
+
+    #[test]
+    fn config_update_duration() {
+        let mut config = Config::default();
+        let new_dur = Duration::from_secs(1800);
+
+        config.update(ConfigMsg::TimerFocus(new_dur));
+
+        assert_eq!(config.pomodoro.timer.focus, new_dur);
+    }
+
+    #[test]
+    fn config_update_string() {
+        let mut config = Config::default();
+
+        config.update(ConfigMsg::HookFocus("notify-send".into()));
+
+        assert_eq!(config.pomodoro.hook.focus, "notify-send");
+    }
+
+    #[test]
+    fn config_update_returns_none() {
+        let mut config = Config::default();
+        let cmds = config.update(ConfigMsg::TimerAutoFocus);
+
+        assert_eq!(cmds[0], ConfigCmd::None);
+    }
+
+    #[test]
+    fn section_from_item_index() {
+        assert_eq!(
+            SettingsSection::from_item_index(SettingsItem::TimerFocus.index()),
+            Some(SettingsSection::Timer)
+        );
+        assert_eq!(
+            SettingsSection::from_item_index(SettingsItem::HookShort.index()),
+            Some(SettingsSection::Hook)
+        );
+    }
+
+    #[test]
+    fn section_from_invalid_index() {
+        assert_eq!(SettingsSection::from_item_index(999), None);
+    }
+
+    #[test]
+    fn section_index_roundtrip() {
+        assert_eq!(
+            SettingsSection::from_index(SettingsSection::Timer.index()),
+            Some(SettingsSection::Timer)
         );
     }
 }

@@ -6,6 +6,7 @@ use crate::service::cmd_runner::run_hook_command;
 use crate::ui::prelude::*;
 use crate::ui::tui::toast::ToastHandler;
 
+/// Executes side-effects for the terminal UI, such as desktop notifications or audio playback.
 pub struct TuiEffectHandler {
     toast: ToastHandler,
     sound: Box<dyn SoundService<SoundType = Alarm>>,
@@ -37,51 +38,75 @@ impl TuiEffectHandler {
 }
 
 impl EffectHandler for TuiEffectHandler {
-    fn execute(&mut self, cmd: Cmd) -> Vec<Msg> {
+    fn execute(&mut self, cmd: Effect) -> Vec<Msg> {
         let mut ret = Vec::new();
         match cmd {
-            Cmd::PlaySound(alarm) => {
+            Effect::PlaySound(alarm) => {
                 if !self.sound.is_playing() {
                     self.sound.set_sound(alarm);
                     let _ = self.sound.play();
                 }
             }
-            Cmd::StopSound => {
+            Effect::StopSound => {
                 let _ = self.sound.stop();
             }
-            Cmd::SendNotification(mode) => {
+            Effect::SendNotification(mode) => {
                 let result = self.notify.send(mode);
                 ret.push(Msg::NotificationSent(result));
             }
-            Cmd::NewSession { task_id, state } => {
-                let session = self.repo.session().new_session(task_id, state).unwrap();
-                ret.push(Msg::SessionCreated { id: session.id });
-            }
-            Cmd::UpdateSession { id } => {
-                let _ = self.repo.session().update(id);
-                ret.push(Msg::SessionUpdated);
-            }
-            Cmd::EndSession { id } => {
-                let _ = self.repo.session().end_session(id);
-                ret.push(Msg::SessionEnded);
-            }
-            Cmd::CloseAllSessions => {
-                let _ = self.repo.session().close_all_sessions();
-                ret.push(Msg::SessionsClosed);
-            }
-            Cmd::SaveConfig(config) => {
+            Effect::SaveConfig(config) => {
                 let result: Result<(), String> = config.save().map_err(|e| e.to_string());
                 ret.push(Msg::ConfigSaved(ConfigSaveResult::from(result)));
             }
-            Cmd::RunHook(command) => {
+            Effect::RunHook(command) => {
                 run_hook_command(&command);
             }
-            Cmd::ShowToast { message, kind } => {
+            Effect::ShowToast { message, kind } => {
                 self.toast.show(message, kind);
             }
-            Cmd::Quit => {
+            Effect::Quit => {
                 let _ = self.sound.stop();
             }
+            Effect::Session(eff) => {
+                use SessionEffect::*;
+                // TODO: Handle errs
+                match eff {
+                    Add { task_id, mode } => {
+                        let session = self.repo.session().new_session(task_id, mode).unwrap();
+                        ret.push(Msg::SessionResult(SessionResultMsg::Added(session)));
+                    }
+                    Update { id } => {
+                        let _ = self.repo.session().update(id);
+                        // ret.push(Msg::SessionResult(SessionResultMsg::Updated));
+                    }
+                    End { id } => {
+                        let _ = self.repo.session().end_session(id);
+                        // ret.push(Msg::SessionResult(SessionResultMsg::Ended));
+                    }
+                    EndAll => {
+                        let _ = self.repo.session().close_all_sessions();
+                        // ret.push(Msg::SessionResult(SessionResultMsg::ClosedAll));
+                    }
+                }
+            }
+            Effect::Task(eff) => match eff {
+                TaskEffect::Add { name, description } => {
+                    match self.repo.task().add(name, description) {
+                        Ok(task) => ret.push(Msg::TaskResult(TaskResultMsg::Added(task))),
+                        Err(e) => ret.extend(self.execute(Effect::ShowToast {
+                            message: format!("Error when creating task: {e}"),
+                            kind: ToastType::Error,
+                        })),
+                    }
+                }
+                TaskEffect::FetchAll => match self.repo.task().all_tasks() {
+                    Ok(tasks) => ret.push(Msg::TaskResult(TaskResultMsg::FetchedAll(tasks))),
+                    Err(e) => ret.extend(self.execute(Effect::ShowToast {
+                        message: format!("Error fetching tasks: {e}"),
+                        kind: ToastType::Error,
+                    })),
+                },
+            },
         }
         ret
     }

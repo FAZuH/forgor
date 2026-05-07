@@ -1,5 +1,6 @@
 use crate::ui::traits::Updateable;
 
+/// Top-level views available in the application.
 #[derive(Clone, Debug, Copy, PartialEq, Eq)]
 pub enum Page {
     Timer,
@@ -23,6 +24,7 @@ impl From<Page> for RouterMsg {
     }
 }
 
+/// Manages the active top-level view of the application.
 #[derive(Debug)]
 pub struct Router {
     active_page: Page,
@@ -60,5 +62,31 @@ mod tests {
 
         router.update(RouterMsg::GoTo(Page::Settings));
         assert_eq!(router.active_page(), Page::Settings);
+    }
+
+    #[test]
+    fn from_page_to_msg() {
+        assert_eq!(RouterMsg::from(Page::Timer), RouterMsg::GoTo(Page::Timer));
+        assert_eq!(
+            RouterMsg::from(Page::Settings),
+            RouterMsg::GoTo(Page::Settings)
+        );
+    }
+
+    #[test]
+    fn update_stay_noop() {
+        let mut router = Router::new(Page::Timer);
+        let cmds = router.update(RouterMsg::Stay);
+
+        assert_eq!(router.active_page(), Page::Timer);
+        assert!(cmds.is_empty());
+    }
+
+    #[test]
+    fn update_go_to_returns_empty() {
+        let mut router = Router::new(Page::Timer);
+        let cmds = router.update(RouterMsg::GoTo(Page::Settings));
+
+        assert!(cmds.is_empty());
     }
 }

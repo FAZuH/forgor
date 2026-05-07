@@ -13,7 +13,9 @@ use crate::utils;
 #[serde(default)]
 pub struct Config {
     pub pomodoro: PomodoroConfig,
+    #[serde(skip)]
     pub logs_path: PathBuf,
+    #[serde(skip)]
     pub db_path: PathBuf,
     #[serde(skip)]
     pub conf_path: PathBuf,
@@ -52,23 +54,16 @@ impl Config {
             info!("created config directory at {conf_dir:?}");
         }
 
-        let config = if !conf_path.exists() {
-            let config = Config::default();
+        if !conf_path.exists() {
             let file = fs::File::create(conf_path)?;
-            serde_norway::to_writer(&file, &config)?;
+            serde_norway::to_writer(&file, &self)?;
             info!("written default config to {:?}", conf_path);
-            config
         } else {
             let file = fs::File::open(conf_path)?;
-            let config = serde_norway::from_reader(&file)?;
+            let config: Config = serde_norway::from_reader(&file)?;
             info!("loaded configuration");
-            config
+            self.pomodoro = config.pomodoro;
         };
-        let conf_dir = self.conf_dir.clone();
-        let conf_path = self.conf_path.clone();
-        *self = config;
-        self.conf_dir = conf_dir;
-        self.conf_path = conf_path;
         Ok(())
     }
 
@@ -240,5 +235,88 @@ impl Alarm {
             .as_ref()
             .map(|p| p.display().to_string())
             .unwrap_or_default()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::*;
+
+    #[test]
+    fn percentage_clamps_above() {
+        assert_eq!(Percentage::new(1.5).volume(), 1.0);
+    }
+
+    #[test]
+    fn percentage_clamps_below() {
+        assert_eq!(Percentage::new(-0.5).volume(), 0.0);
+    }
+
+    #[test]
+    fn percentage_new_in_range() {
+        assert_eq!(Percentage::new(0.75).volume(), 0.75);
+    }
+
+    #[test]
+    fn percentage_try_from_str() {
+        assert_eq!(Percentage::try_from("50").unwrap().volume(), 0.5);
+        assert_eq!(Percentage::try_from("100").unwrap().volume(), 1.0);
+    }
+
+    #[test]
+    fn percentage_try_from_str_invalid() {
+        assert!(Percentage::try_from("abc").is_err());
+    }
+
+    #[test]
+    fn percentage_display() {
+        assert_eq!(Percentage::new(0.5).to_string(), "50%");
+        assert_eq!(Percentage::new(1.0).to_string(), "100%");
+        assert_eq!(Percentage::new(0.0).to_string(), "0%");
+    }
+
+    #[test]
+    fn percentage_default() {
+        let p = Percentage::default();
+        assert_eq!(p.volume(), 0.5);
+    }
+
+    #[test]
+    fn percentage_full() {
+        assert_eq!(Percentage::full().volume(), 1.0);
+    }
+
+    #[test]
+    fn percentage_muted() {
+        assert_eq!(Percentage::muted().volume(), 0.0);
+    }
+
+    #[test]
+    fn percentage_half() {
+        assert_eq!(Percentage::half().volume(), 0.5);
+    }
+
+    #[test]
+    fn duration_as_secs_roundtrip() {
+        let dur = Duration::from_secs(300);
+        let serialized = serde_norway::to_string(&duration_as_secs_wrapper::Wrapper(dur)).unwrap();
+        let deserialized: duration_as_secs_wrapper::Wrapper =
+            serde_norway::from_str(&serialized).unwrap();
+        assert_eq!(deserialized.0, dur);
+    }
+
+    /// Minimal serde wrapper to test the `duration_as_secs` module in isolation.
+    mod duration_as_secs_wrapper {
+        use std::time::Duration;
+
+        use serde::Deserialize;
+        use serde::Serialize;
+
+        #[derive(Debug, PartialEq, Serialize, Deserialize)]
+        pub(super) struct Wrapper(
+            #[serde(with = "super::super::duration_as_secs")] pub(super) Duration,
+        );
     }
 }

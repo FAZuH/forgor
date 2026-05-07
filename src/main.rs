@@ -8,6 +8,7 @@ use tomo::config::Config;
 use tomo::error::AppError;
 use tomo::log::setup_logging;
 use tomo::model::Pomodoro;
+use tomo::model::Task;
 use tomo::repo::Repos;
 use tomo::service::DesktopNotifyService;
 use tomo::service::NotifyService;
@@ -23,6 +24,7 @@ type View = Box<dyn Runner>;
 fn main() -> Result<(), AppError> {
     let cli = Cli::parse();
 
+    // config
     let mut conf = if let Some(ref conf) = cli.config_path {
         Config::new(conf.clone())
     } else {
@@ -30,23 +32,23 @@ fn main() -> Result<(), AppError> {
     };
     conf.load()?;
 
+    let is_duplicate_instance = is_duplicate(&conf.conf_dir);
+
+    // logging
     setup_logging(&conf.logs_path)?;
     color_eyre::install().unwrap();
     info!("initializing {} v{}", tomo::APP_NAME, tomo::APP_VERSION);
+    info!("config dir is: {}", conf.conf_dir.display());
 
-    let lock_path = conf.conf_dir.join("tomo.lock");
-    let lock_file = std::fs::OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(&lock_path)
-        .unwrap();
-    let mut lock = fd_lock::RwLock::new(lock_file);
-    let _guard = lock.try_write();
-    let is_duplicate_instance = _guard.is_err();
-
+    // db
     let repo = repo(&conf.db_path);
+    let initial_task = cli.task.clone().map(|name| {
+        repo.task()
+            .find_by_name(name.clone())
+            .unwrap_or_else(|_| repo.task().add(name, None).unwrap())
+    });
+
+    // services
     let sound = alarm();
     let notify = notify();
     let pomo = pomodoro(&cli, &conf);
@@ -55,7 +57,15 @@ fn main() -> Result<(), AppError> {
         repo.session().close_all_sessions().unwrap();
     }
 
-    let mut runner = view(conf, repo, sound, notify, pomo, is_duplicate_instance);
+    let mut runner = view(
+        conf,
+        repo,
+        sound,
+        notify,
+        pomo,
+        is_duplicate_instance,
+        initial_task,
+    );
     info!("starting view");
     runner.run().unwrap();
     Ok(())
@@ -68,13 +78,14 @@ fn view(
     notify: Notify,
     pomo: Pomodoro,
     is_duplicate: bool,
+    initial_task: Option<Task>,
 ) -> View {
     use tomo::ui::core::AppCore;
     use tomo::ui::tui::TuiEffectHandler;
     use tomo::ui::tui::TuiRunner;
 
     let effect = TuiEffectHandler::new(sound, notify, repo);
-    let core = AppCore::new(pomo, conf, effect, is_duplicate);
+    let core = AppCore::new(pomo, conf, effect, is_duplicate, initial_task);
 
     Box::new(TuiRunner::new(core).unwrap())
 }
@@ -107,4 +118,17 @@ fn alarm() -> Sound {
 
 fn notify() -> Notify {
     Box::new(DesktopNotifyService)
+}
+
+fn is_duplicate(conf_dir: &std::path::Path) -> bool {
+    let lock_path = conf_dir.join("tomo.lock");
+    let lock_file = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&lock_path)
+        .unwrap();
+    let mut lock = fd_lock::RwLock::new(lock_file);
+    lock.try_write().is_err()
 }

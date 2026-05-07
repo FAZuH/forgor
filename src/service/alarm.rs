@@ -82,3 +82,23 @@ impl SoundService for AlarmService {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn play_without_config() {
+        let mut service = AlarmService::new();
+        let result = service.play();
+
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), SoundError::ConfigError(_)));
+    }
+
+    #[test]
+    fn is_playing_returns_false_when_no_player() {
+        let service = AlarmService::new();
+        assert!(!service.is_playing());
+    }
+}
