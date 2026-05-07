@@ -48,6 +48,19 @@ impl Pomodoro {
         }
     }
 
+    pub fn update_settings(
+        &mut self,
+        focus: Duration,
+        long_break: Duration,
+        short_break: Duration,
+        long_interval: u32,
+    ) {
+        self.focus = focus;
+        self.long_break = long_break;
+        self.short_break = short_break;
+        self.long_interval = long_interval;
+    }
+
     /// Starts the Pomodoro session timer.
     ///
     /// # Errors
