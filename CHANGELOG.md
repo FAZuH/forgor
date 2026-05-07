@@ -1,3 +1,21 @@
+## 0.2.8 (2026-05-07)
+
+
+### Bug Fixes
+
+* Updating timer settings does not update timer data ([c3826c1](https://github.com/FAZuH/tomo/commit/c3826c14baf010caba6eb75b160282b724bcf8cd)), closes [#65](https://github.com/FAZuH/tomo/issues/65)
+
+
+### Documentation
+
+* Add demo video to README ([65bdeba](https://github.com/FAZuH/tomo/commit/65bdeba6e9d9eb879467a03eb3d7163afdce5c76))
+
+
+### New Features
+
+* Add path autocomplete to settings ([72d5f2e](https://github.com/FAZuH/tomo/commit/72d5f2eee11d7765d3cb1f4619a079c76250c70b)), closes [#34](https://github.com/FAZuH/tomo/issues/34)
+* Show idle time in prompt transition ([3e1e8f8](https://github.com/FAZuH/tomo/commit/3e1e8f821a5196c94fbfcc682c424994684386db)), closes [#59](https://github.com/FAZuH/tomo/issues/59)
+
 ## 0.2.7 (2026-05-07)
 
 
@@ -63,25 +81,4 @@
 * Improve crash handling ([18a7d1a](https://github.com/FAZuH/tomo/commit/18a7d1a633d319c40ee905d391a2c8589546851c))
 * Show paused duration ([5f975d7](https://github.com/FAZuH/tomo/commit/5f975d729b00a773c0493e3eeb0b12946ffcf8a8)), closes [#38](https://github.com/FAZuH/tomo/issues/38)
 * Show remaining focus sessions before a long break ([dcd4cd3](https://github.com/FAZuH/tomo/commit/dcd4cd3927332da81b0028826ea96ccc1da2f8a2)), closes [#39](https://github.com/FAZuH/tomo/issues/39)
-
-## 0.2.3 (2026-05-01)
-
-
-### New Features
-
-* Add "Auto-start on Launch" setting ([0caebea](https://github.com/FAZuH/tomo/commit/0caebea06b810fc5dabdeb3c8ee7db4cb96e5537))
-* Improve settings prompt titles ([15310dc](https://github.com/FAZuH/tomo/commit/15310dcf8d262c68d9d81b31455ed5202c628296))
-* Improve timer transition prompt UI ([f319797](https://github.com/FAZuH/tomo/commit/f319797656557eb68aa59a54f40f3e64a93abcae))
-* Make invalid path red in settings ([3983de9](https://github.com/FAZuH/tomo/commit/3983de9e70eea01ed0d717ac0c11ef3380e88d70))
-* Remove duplicate keymap hint ([caa1935](https://github.com/FAZuH/tomo/commit/caa19357ffaf5fa3f2fd7b9ed09e0e603e4790b2))
-* Set default alarm volume to 50% ([35031fd](https://github.com/FAZuH/tomo/commit/35031fd599a9d8b7531888565569a04643d883f0))
-* Set default launch auto-start to true ([d64b643](https://github.com/FAZuH/tomo/commit/d64b643c5e6ad3dd74d44c170d8e1053fe7fa491))
-* Stop alarm after transition ([1f5d2f1](https://github.com/FAZuH/tomo/commit/1f5d2f12e52a8b28f37ad9763c7b6f32578c567d))
-* Transition & pause when timer prompt is answered no ([3bd3e3e](https://github.com/FAZuH/tomo/commit/3bd3e3edd7130600134cfffceb072ebe47c02959))
-
-
-### Bug Fixes
-
-* Fix alarm path change not taking effect without restart ([accd464](https://github.com/FAZuH/tomo/commit/accd464b1edee8bd66d43dd118e1389af29fb274))
-* Timer keybind help symbols not rendering properly on Windows ([7b95e1c](https://github.com/FAZuH/tomo/commit/7b95e1c630fd07065d55a2481265e6b9cab2a2ac))
 
