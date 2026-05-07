@@ -54,22 +54,6 @@ impl EffectHandler for TuiEffectHandler {
                 let result = self.notify.send(mode);
                 ret.push(Msg::NotificationSent(result));
             }
-            Effect::NewSession { task_id, mode } => {
-                let session = self.repo.session().new_session(task_id, mode).unwrap();
-                ret.push(Msg::SessionCreated { id: session.id });
-            }
-            Effect::UpdateSession { id } => {
-                let _ = self.repo.session().update(id);
-                ret.push(Msg::SessionUpdated);
-            }
-            Effect::EndSession { id } => {
-                let _ = self.repo.session().end_session(id);
-                ret.push(Msg::SessionEnded);
-            }
-            Effect::CloseAllSessions => {
-                let _ = self.repo.session().close_all_sessions();
-                ret.push(Msg::SessionsClosed);
-            }
             Effect::SaveConfig(config) => {
                 let result: Result<(), String> = config.save().map_err(|e| e.to_string());
                 ret.push(Msg::ConfigSaved(ConfigSaveResult::from(result)));
@@ -83,7 +67,29 @@ impl EffectHandler for TuiEffectHandler {
             Effect::Quit => {
                 let _ = self.sound.stop();
             }
-            Effect::Task(msg) => match msg {
+            Effect::Session(eff) => {
+                use SessionEffect::*;
+                // TODO: Handle errs
+                match eff {
+                    Add { task_id, mode } => {
+                        let session = self.repo.session().new_session(task_id, mode).unwrap();
+                        ret.push(Msg::SessionResult(SessionResultMsg::Added(session)));
+                    }
+                    Update { id } => {
+                        let _ = self.repo.session().update(id);
+                        // ret.push(Msg::SessionResult(SessionResultMsg::Updated));
+                    }
+                    End { id } => {
+                        let _ = self.repo.session().end_session(id);
+                        // ret.push(Msg::SessionResult(SessionResultMsg::Ended));
+                    }
+                    EndAll => {
+                        let _ = self.repo.session().close_all_sessions();
+                        // ret.push(Msg::SessionResult(SessionResultMsg::ClosedAll));
+                    }
+                }
+            }
+            Effect::Task(eff) => match eff {
                 TaskEffect::Add { name, description } => {
                     match self.repo.task().add(name, description) {
                         Ok(task) => ret.push(Msg::TaskResult(TaskResultMsg::Added(task))),

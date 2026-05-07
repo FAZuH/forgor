@@ -5,6 +5,7 @@ use crate::config::Hooks;
 use crate::config::Timers;
 use crate::model::Mode;
 use crate::model::Pomodoro;
+use crate::model::Session;
 use crate::model::Task;
 use crate::ui::prelude::*;
 
@@ -35,12 +36,8 @@ pub enum Msg {
 
     // Effect results for further core handling
     TaskResult(TaskResultMsg),
-    SessionCreated {
-        id: i32,
-    },
-    SessionUpdated,
-    SessionEnded,
-    SessionsClosed,
+    SessionResult(SessionResultMsg),
+
     ConfigSaved(ConfigSaveResult),
     NotificationSent(Result<(), String>),
 
@@ -69,10 +66,7 @@ pub enum Effect {
     // Notification
     SendNotification(Mode),
     // Sessions
-    NewSession { task_id: Option<i32>, mode: Mode },
-    UpdateSession { id: i32 },
-    EndSession { id: i32 },
-    CloseAllSessions,
+    Session(SessionEffect),
     // Task
     Task(TaskEffect),
     // Toast
@@ -90,7 +84,7 @@ pub struct AppCore<E: EffectHandler> {
     effects: E,
 
     current_task: Option<Task>,
-    active_session: Option<i32>,
+    active_session: Option<Session>,
     config_snapshot: Config,
     overlay: Option<Overlay>,
     is_quit: bool,
@@ -217,10 +211,6 @@ impl<E: EffectHandler> Updateable<Msg, Effect> for AppCore<E> {
             Msg::ViewTimerCmd(cmd) => ret.extend(self.translate_timer_cmd(cmd)),
             Msg::ViewSettingsCmd(cmd) => ret.extend(self.translate_settings_cmd(cmd)),
             Msg::Tick => ret.extend(self.handle_tick()),
-            Msg::SessionCreated { id } => self.active_session = Some(id),
-            Msg::SessionUpdated => {}
-            Msg::SessionEnded => self.active_session = None,
-            Msg::SessionsClosed => {}
             Msg::ConfigSaved(result) => ret.extend(self.handle_config_saved(result)),
             Msg::NotificationSent(_) => {}
             Msg::DuplicateWarningDismiss => self.overlay = None,
@@ -241,6 +231,13 @@ impl<E: EffectHandler> Updateable<Msg, Effect> for AppCore<E> {
             Msg::ResetWarningCancel => self.overlay = None,
             Msg::ResetWarningShow => self.overlay = Some(Overlay::ResetWarning),
 
+            Msg::SessionResult(msg) => {
+                use SessionResultMsg::*;
+                match msg {
+                    Added(session) => self.active_session = Some(session),
+                    Ended => self.active_session = None,
+                }
+            }
             Msg::TaskResult(msg) => match msg {
                 TaskResultMsg::Added(task) => {
                     self.current_task = Some(task);
@@ -282,8 +279,8 @@ impl<E: EffectHandler> AppCore<E> {
         let mut ret = vec![];
 
         // Bump the session timestamp on every tick.
-        if let Some(id) = self.active_session {
-            ret.push(Effect::UpdateSession { id });
+        if let Some(ses) = &self.active_session {
+            ret.push(Effect::Session(SessionEffect::Update { id: ses.id }));
         }
 
         ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::Tick)));
@@ -307,7 +304,7 @@ impl<E: EffectHandler> AppCore<E> {
         }
     }
 
-    fn take_active_session_id(&mut self) -> Option<i32> {
+    fn take_active_session_id(&mut self) -> Option<Session> {
         self.active_session.take()
     }
 
@@ -315,8 +312,8 @@ impl<E: EffectHandler> AppCore<E> {
         let mut ret = Vec::new();
 
         // End the active session (.take() so only fires once).
-        if let Some(id) = self.active_session.take() {
-            ret.push(Effect::EndSession { id });
+        if let Some(ses) = self.active_session.take() {
+            ret.push(Effect::Session(SessionEffect::End { id: ses.id }));
         }
 
         // Fire effects: sound, notification, hook.
@@ -374,10 +371,10 @@ impl<E: EffectHandler> AppCore<E> {
         let mut ret = Vec::new();
         match cmd {
             PomodoroCmd::Started(mode) => {
-                ret.push(Effect::NewSession {
+                ret.push(Effect::Session(SessionEffect::Add {
                     task_id: self.current_task.as_ref().map(|t| t.id),
                     mode,
-                });
+                }));
             }
             PomodoroCmd::StartedPaused => {}
             PomodoroCmd::SessionEnd {
@@ -387,30 +384,30 @@ impl<E: EffectHandler> AppCore<E> {
                 ret.extend(self.handle_session_end(curr_mode, next_mode));
             }
             PomodoroCmd::NextSession(mode) => {
-                ret.push(Effect::NewSession {
+                ret.push(Effect::Session(SessionEffect::Add {
                     task_id: self.current_task.as_ref().map(|t| t.id),
                     mode,
-                });
+                }));
             }
             PomodoroCmd::SessionPaused => {
-                if let Some(id) = self.take_active_session_id() {
-                    ret.push(Effect::EndSession { id });
+                if let Some(ses) = self.take_active_session_id() {
+                    ret.push(Effect::Session(SessionEffect::End { id: ses.id }));
                 }
             }
             PomodoroCmd::SessionResumed(mode) => {
-                ret.push(Effect::NewSession {
+                ret.push(Effect::Session(SessionEffect::Add {
                     task_id: self.current_task.as_ref().map(|t| t.id),
                     mode,
-                });
+                }));
             }
             PomodoroCmd::SessionSkipped(mode) => {
-                if let Some(id) = self.take_active_session_id() {
-                    ret.push(Effect::EndSession { id });
+                if let Some(ses) = self.take_active_session_id() {
+                    ret.push(Effect::Session(SessionEffect::End { id: ses.id }));
                 }
-                ret.push(Effect::NewSession {
+                ret.push(Effect::Session(SessionEffect::Add {
                     task_id: self.current_task.as_ref().map(|t| t.id),
                     mode,
-                });
+                }));
             }
         }
         ret
@@ -526,13 +523,17 @@ mod tests {
     #[test]
     fn tick_updates_active_session() {
         let mut core = AppCore::new(test_pomodoro(), test_config(), MockEffects, false, None);
-        core.update(Msg::SessionCreated { id: 42 });
+        let ses = Session {
+            id: 42,
+            ..Default::default()
+        };
+        core.update(Msg::SessionResult(SessionResultMsg::Added(ses.clone())));
 
         let cmds = core.update(Msg::Tick);
 
         assert!(
             cmds.iter()
-                .any(|c| matches!(c, Effect::UpdateSession { id: 42 }))
+                .any(|c| matches!(c, Effect::Session(SessionEffect::Update { id: 42 })))
         );
     }
 
@@ -544,7 +545,7 @@ mod tests {
         assert!(
             !cmds
                 .iter()
-                .any(|c| matches!(c, Effect::UpdateSession { .. }))
+                .any(|c| matches!(c, Effect::Session(SessionEffect::Update { .. })))
         );
     }
 
@@ -683,7 +684,10 @@ mod tests {
         let mut core = AppCore::new(pomo, test_config(), MockEffects, false, None);
 
         core.update(Msg::Pomodoro(PomodoroMsg::Start));
-        core.update(Msg::SessionCreated { id: 1 });
+        core.update(Msg::SessionResult(SessionResultMsg::Added(Session {
+            id: 1,
+            ..Default::default()
+        })));
 
         let cmds = core.update(Msg::Pomodoro(PomodoroMsg::Tick));
 
@@ -695,7 +699,7 @@ mod tests {
         assert!(cmds.iter().any(|c| matches!(c, Effect::RunHook(_))));
         assert!(
             cmds.iter()
-                .any(|c| matches!(c, Effect::EndSession { id: 1 }))
+                .any(|c| matches!(c, Effect::Session(SessionEffect::End { id: 1 })))
         );
         assert_eq!(core.overlay(), Some(Overlay::PromptingTransition));
     }
@@ -713,7 +717,10 @@ mod tests {
 
         let mut core = AppCore::new(pomo, config, MockEffects, false, None);
         core.update(Msg::Pomodoro(PomodoroMsg::Start));
-        core.update(Msg::SessionCreated { id: 1 });
+        core.update(Msg::SessionResult(SessionResultMsg::Added(Session {
+            id: 1,
+            ..Default::default()
+        })));
 
         let cmds = core.update(Msg::Pomodoro(PomodoroMsg::Tick));
 
@@ -724,7 +731,10 @@ mod tests {
         assert!(cmds.iter().any(|c| matches!(c, Effect::PlaySound(_))));
         assert!(cmds.iter().any(|c| matches!(c, Effect::RunHook(_))));
         assert_eq!(core.overlay(), None);
-        assert!(cmds.iter().any(|c| matches!(c, Effect::NewSession { .. })));
+        assert!(
+            cmds.iter()
+                .any(|c| matches!(c, Effect::Session(SessionEffect::Add { .. })))
+        );
     }
 
     #[test]
@@ -738,14 +748,20 @@ mod tests {
         let mut core = AppCore::new(pomo, test_config(), MockEffects, false, None);
 
         core.update(Msg::Pomodoro(PomodoroMsg::Start));
-        core.update(Msg::SessionCreated { id: 1 });
+        core.update(Msg::SessionResult(SessionResultMsg::Added(Session {
+            id: 1,
+            ..Default::default()
+        })));
 
         // First session end fires effects
         core.update(Msg::Pomodoro(PomodoroMsg::Tick));
         assert_eq!(core.overlay(), Some(Overlay::PromptingTransition));
 
         // Another tick while prompting should not fire duplicate effects
-        core.update(Msg::SessionCreated { id: 2 });
+        core.update(Msg::SessionResult(SessionResultMsg::Added(Session {
+            id: 2,
+            ..Default::default()
+        })));
         let cmds = core.update(Msg::Pomodoro(PomodoroMsg::Tick));
         assert!(
             !cmds
@@ -796,7 +812,10 @@ mod tests {
         let cmds = core.translate_pomodoro_cmd(PomodoroCmd::Started(Mode::Focus));
 
         assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], Effect::NewSession { .. }));
+        assert!(matches!(
+            cmds[0],
+            Effect::Session(SessionEffect::Add { .. })
+        ));
     }
 
     #[test]
@@ -810,12 +829,18 @@ mod tests {
     #[test]
     fn pomodoro_cmd_session_paused_with_active_session() {
         let mut core = test_appcore();
-        core.update(Msg::SessionCreated { id: 7 });
+        core.update(Msg::SessionResult(SessionResultMsg::Added(Session {
+            id: 7,
+            ..Default::default()
+        })));
 
         let cmds = core.translate_pomodoro_cmd(PomodoroCmd::SessionPaused);
 
         assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], Effect::EndSession { id: 7 }));
+        assert!(matches!(
+            cmds[0],
+            Effect::Session(SessionEffect::End { id: 7 })
+        ));
     }
 
     #[test]
@@ -832,19 +857,31 @@ mod tests {
         let cmds = core.translate_pomodoro_cmd(PomodoroCmd::SessionResumed(Mode::Focus));
 
         assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], Effect::NewSession { .. }));
+        assert!(matches!(
+            cmds[0],
+            Effect::Session(SessionEffect::Add { .. })
+        ));
     }
 
     #[test]
     fn pomodoro_cmd_session_skipped_ends_and_starts() {
         let mut core = test_appcore();
-        core.update(Msg::SessionCreated { id: 3 });
+        core.update(Msg::SessionResult(SessionResultMsg::Added(Session {
+            id: 3,
+            ..Default::default()
+        })));
 
         let cmds = core.translate_pomodoro_cmd(PomodoroCmd::SessionSkipped(Mode::ShortBreak));
 
         assert_eq!(cmds.len(), 2);
-        assert!(matches!(cmds[0], Effect::EndSession { id: 3 }));
-        assert!(matches!(cmds[1], Effect::NewSession { .. }));
+        assert!(matches!(
+            cmds[0],
+            Effect::Session(SessionEffect::End { id: 3 })
+        ));
+        assert!(matches!(
+            cmds[1],
+            Effect::Session(SessionEffect::Add { .. })
+        ));
     }
 
     #[test]
@@ -853,7 +890,10 @@ mod tests {
         let cmds = core.translate_pomodoro_cmd(PomodoroCmd::NextSession(Mode::LongBreak));
 
         assert_eq!(cmds.len(), 1);
-        assert!(matches!(cmds[0], Effect::NewSession { .. }));
+        assert!(matches!(
+            cmds[0],
+            Effect::Session(SessionEffect::Add { .. })
+        ));
     }
 
     #[test]
