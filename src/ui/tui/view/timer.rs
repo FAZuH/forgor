@@ -49,6 +49,7 @@ impl TuiTimerView {
         canvas: &mut Frame,
         state: &Pomodoro,
         is_prompting_transition: bool,
+        transition_prompt_at: Option<Instant>,
         current_task: Option<&Task>,
     ) {
         let area = canvas.area();
@@ -73,7 +74,13 @@ impl TuiTimerView {
         }
         self.keybinds(rows[12], buf, show_binds);
 
-        self.prompt_transition(area, buf, state, is_prompting_transition);
+        self.prompt_transition(
+            area,
+            buf,
+            state,
+            is_prompting_transition,
+            transition_prompt_at,
+        );
         self.prompt_task(canvas, area);
     }
 }
@@ -86,16 +93,31 @@ impl TuiTimerView {
         buf: &mut Buffer,
         pomo: &Pomodoro,
         is_prompting_transition: bool,
+        prompt_at: Option<Instant>,
     ) {
         if is_prompting_transition {
             let next = pomo.next_mode().to_string().to_lowercase();
+            let idle_line = if let Some(start) = prompt_at {
+                let elapsed = Instant::now().duration_since(start).as_secs();
+                let mins = elapsed / 60;
+                let secs = elapsed % 60;
+                let formatted = if mins == 0 {
+                    format!("{secs}s")
+                } else {
+                    format!("{mins}m {secs}s")
+                };
+                Line::from(format!("     idle: {formatted}     "))
+                    .alignment(Alignment::Center)
+                    .style(Style::default().dim().fg(Color::Gray))
+            } else {
+                Line::from("")
+            };
             let body = Text::from(vec![
                 Line::from(""),
                 Line::from(""),
                 Line::from(format!("     start {next} session?     ")).alignment(Alignment::Center),
+                idle_line,
                 Line::from(""),
-                Line::from(""),
-                Line::from("              ").alignment(Alignment::Center),
                 Line::from(vec![
                     Span::from("       "),
                     Span::styled(

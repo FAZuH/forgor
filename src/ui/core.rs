@@ -87,6 +87,7 @@ pub struct AppCore<E: EffectHandler> {
     active_session: Option<Session>,
     config_snapshot: Config,
     overlay: Option<Overlay>,
+    transition_prompt_at: Option<std::time::Instant>,
     is_quit: bool,
     task_suggestions_cache: Option<Vec<Task>>,
 }
@@ -124,6 +125,7 @@ impl<E: EffectHandler> AppCore<E> {
             current_task: initial_task,
             active_session: None,
             overlay,
+            transition_prompt_at: None,
             is_quit: false,
             task_suggestions_cache: None,
         }
@@ -186,6 +188,10 @@ impl<E: EffectHandler> AppCore<E> {
 
     pub fn overlay(&self) -> Option<Overlay> {
         self.overlay
+    }
+
+    pub fn transition_prompt_at(&self) -> Option<std::time::Instant> {
+        self.transition_prompt_at
     }
 
     pub fn set_overlay(&mut self, overlay: Option<Overlay>) {
@@ -351,6 +357,8 @@ impl<E: EffectHandler> AppCore<E> {
             ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::NextSession)));
         } else {
             self.overlay = Some(Overlay::PromptingTransition);
+            self.transition_prompt_at
+                .get_or_insert(std::time::Instant::now());
         }
 
         ret
@@ -460,6 +468,7 @@ impl<E: EffectHandler> AppCore<E> {
             }
         };
         self.set_overlay(None);
+        self.transition_prompt_at = None;
 
         ret
     }

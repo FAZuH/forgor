@@ -115,6 +115,7 @@ impl TuiRunner {
                             f,
                             self.core.pomodoro(),
                             is_prompting_transition,
+                            self.core.transition_prompt_at(),
                             self.core.current_task(),
                         )
                     }
