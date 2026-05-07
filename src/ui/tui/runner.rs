@@ -9,7 +9,7 @@ use tui_widgets::prompts::State;
 use tui_widgets::prompts::Status;
 
 use crate::ui::UiError;
-use crate::ui::core::Cmd;
+use crate::ui::core::Effect;
 use crate::ui::core::Msg;
 use crate::ui::core::Overlay;
 use crate::ui::prelude::*;
@@ -18,6 +18,7 @@ use crate::ui::tui::TuiError;
 use crate::ui::tui::backend::Tui;
 use crate::ui::tui::view::*;
 use crate::ui::update::PomodoroMsg;
+use crate::ui::update::TaskMsg;
 
 /// The terminal UI implementation of the application runner using Crossterm and Ratatui.
 pub struct TuiRunner {
@@ -35,6 +36,36 @@ impl Runner for TuiRunner {
     fn run(&mut self) -> Result<(), UiError> {
         Ok(self.run_loop()?)
     }
+}
+
+macro_rules! dsp {
+    // Direct core dispatch: dsp!(self, core, msg)
+    ($self:ident, core, $msg:expr) => {{
+        $self.core.dispatch($msg);
+        $self.redraw = true;
+    }};
+    // Wrapped message dispatch: dsp!(self, pomo, msg) → Msg::Pomodoro(msg)
+    ($self:ident, pomo,   $msg:expr) => {
+        dsp!($self, core, Msg::Pomodoro($msg))
+    };
+    ($self:ident, router, $msg:expr) => {
+        dsp!($self, core, Msg::Router($msg))
+    };
+    // View update dispatch: dsp!(self, timer, msg) → update → cmds
+    ($self:ident, timer, $msg:expr) => {{
+        let cmds = $self.timer.update($msg);
+        for cmd in cmds {
+            $self.core.dispatch(Msg::ViewTimerCmd(cmd));
+        }
+        $self.redraw = true;
+    }};
+    ($self:ident, setting, $msg:expr) => {{
+        let cmds = $self.settings.update($msg);
+        for cmd in cmds {
+            $self.core.dispatch(Msg::ViewSettingsCmd(cmd));
+        }
+        $self.redraw = true;
+    }};
 }
 
 impl TuiRunner {
@@ -66,9 +97,9 @@ impl TuiRunner {
         let auto_start = self.core.config().pomodoro.timer.auto_start_on_launch;
 
         if auto_start {
-            self.dispatch_pomo(PomodoroMsg::Start);
+            dsp!(self, pomo, PomodoroMsg::Start);
         } else {
-            self.dispatch_pomo(PomodoroMsg::StartPaused);
+            dsp!(self, pomo, PomodoroMsg::StartPaused);
         }
     }
 
@@ -80,8 +111,13 @@ impl TuiRunner {
                     Page::Timer => {
                         let is_prompting_transition =
                             self.core.overlay() == Some(Overlay::PromptingTransition);
-                        self.timer
-                            .render(f, self.core.pomodoro(), is_prompting_transition)
+                        self.timer.render(
+                            f,
+                            self.core.pomodoro(),
+                            is_prompting_transition,
+                            self.core.transition_prompt_at(),
+                            self.core.current_task(),
+                        )
                     }
                     Page::Settings => {
                         let is_config_dirty = self.core.is_config_dirty();
@@ -112,50 +148,8 @@ impl TuiRunner {
     fn tick(&mut self) {
         if self.tick.new_tick() {
             self.core.effects_mut().toast_mut().tick();
-            self.dispatch_core(Msg::Tick);
+            dsp!(self, core, Msg::Tick);
         }
-    }
-
-    // ---------------------------------------------------------
-    //  ___ ___ ___ ___  _ _____ ___ _  _
-    // |   \_ _/ __| _ \/_\_   _/ __| || |
-    // | |) | |\__ \  _/ _ \| || (__| __ |
-    // |___/___|___/_|/_/ \_\_| \___|_||_|
-    // ---------------------------------------------------------
-
-    fn dispatch_core(&mut self, msg: Msg) {
-        log::trace!("msg core: {:?}", msg);
-        self.core.dispatch(msg);
-        self.redraw();
-    }
-
-    fn dispatch_pomo(&mut self, msg: PomodoroMsg) {
-        log::trace!("msg pomo: {:?}", msg);
-        self.core.dispatch(Msg::Pomodoro(msg));
-        self.redraw();
-    }
-
-    fn dispatch_router(&mut self, msg: RouterMsg) {
-        log::trace!("msg router: {:?}", msg);
-        self.core.dispatch(Msg::Router(msg));
-        self.redraw();
-    }
-
-    fn dispatch_timer(&mut self, msg: TimerMsg) {
-        log::trace!("msg timer: {:?}", msg);
-        let cmds = self.timer.update(msg);
-        for cmd in cmds {
-            self.core.dispatch(Msg::ViewTimerCmd(cmd));
-        }
-        self.redraw();
-    }
-
-    fn dispatch_setting(&mut self, msg: SettingsMsg) {
-        let cmds = self.settings.update(msg);
-        for cmd in cmds {
-            self.core.dispatch(Msg::ViewSettingsCmd(cmd));
-        }
-        self.redraw();
     }
 
     // ---------------------------------------------------------
@@ -208,8 +202,8 @@ impl TuiRunner {
     fn common_handler(&mut self, event: &Event) {
         match event {
             Event::Key(key) => match key.code {
-                KeyCode::Char('m') => self.core.execute_effect(Cmd::StopSound),
-                KeyCode::Char('q') => self.dispatch_core(Msg::Quit),
+                KeyCode::Char('m') => self.core.execute_effect(Effect::StopSound),
+                KeyCode::Char('q') => dsp!(self, core, Msg::Quit),
                 _ => {}
             },
             Event::Resize(..) => self.redraw(),
@@ -221,12 +215,8 @@ impl TuiRunner {
         if let Event::Key(key) = event {
             use KeyCode as K;
             match key.code {
-                K::Enter | K::Char('y') => {
-                    self.dispatch_core(Msg::ResetWarningProceed);
-                }
-                K::Esc | K::Char('n') => {
-                    self.dispatch_core(Msg::ResetWarningCancel);
-                }
+                K::Enter | K::Char('y') => dsp!(self, core, Msg::ResetWarningProceed),
+                K::Esc | K::Char('n') => dsp!(self, core, Msg::ResetWarningCancel),
                 _ => {}
             }
         }
@@ -236,15 +226,9 @@ impl TuiRunner {
         if let Event::Key(key) = event {
             use KeyCode as K;
             match key.code {
-                K::Enter | K::Char('s') => {
-                    self.dispatch_core(Msg::UnsavedWarningSave);
-                }
-                K::Esc => {
-                    self.dispatch_core(Msg::UnsavedWarningCancel);
-                }
-                K::Char('q') => {
-                    self.dispatch_core(Msg::UnsavedWarningQuit);
-                }
+                K::Enter | K::Char('s') => dsp!(self, core, Msg::UnsavedWarningSave),
+                K::Esc => dsp!(self, core, Msg::UnsavedWarningCancel),
+                K::Char('q') => dsp!(self, core, Msg::UnsavedWarningQuit),
                 _ => {}
             }
         }
@@ -254,18 +238,18 @@ impl TuiRunner {
         if let Event::Key(key) = event {
             use KeyCode as K;
             match key.code {
-                K::Enter | K::Char('y') => {
-                    self.dispatch_core(Msg::DuplicateWarningDismiss);
-                }
-                K::Char('q') | K::Esc | K::Char('n') => {
-                    self.dispatch_core(Msg::DuplicateWarningQuit);
-                }
+                K::Enter | K::Char('y') => dsp!(self, core, Msg::DuplicateWarningDismiss),
+                K::Char('q') | K::Esc | K::Char('n') => dsp!(self, core, Msg::DuplicateWarningQuit),
                 _ => {}
             }
         }
     }
 
     fn handle_timer(&mut self, event: Event) {
+        if self.timer.is_editing() {
+            return self.handle_timer_edit(event);
+        }
+
         if self.core.overlay() == Some(Overlay::PromptingTransition) {
             return self.handle_timer_transition(event);
         }
@@ -274,15 +258,16 @@ impl TuiRunner {
         use PomodoroMsg::*;
         if let Event::Key(key) = event {
             match key.code {
-                K::Right | K::Char('l') => self.dispatch_pomo(Subtract(Duration::from_secs(30))),
-                K::Down | K::Char('j') => self.dispatch_pomo(Subtract(Duration::from_secs(60))),
-                K::Left | K::Char('h') => self.dispatch_pomo(Add(Duration::from_secs(30))),
-                K::Up | K::Char('k') => self.dispatch_pomo(Add(Duration::from_secs(60))),
-                K::Char(' ') => self.dispatch_pomo(TogglePause),
-                K::Enter => self.dispatch_pomo(SkipSession),
-                K::Backspace => self.dispatch_core(Msg::ResetWarningShow),
-                K::Char('s') => self.dispatch_router(RouterMsg::GoTo(Page::Settings)),
-                K::Char('/') | K::Char('?') => self.dispatch_timer(TimerMsg::ToggleShowKeybinds),
+                K::Right | K::Char('l') => dsp!(self, pomo, Subtract(Duration::from_secs(30))),
+                K::Down | K::Char('j') => dsp!(self, pomo, Subtract(Duration::from_secs(60))),
+                K::Left | K::Char('h') => dsp!(self, pomo, Add(Duration::from_secs(30))),
+                K::Up | K::Char('k') => dsp!(self, pomo, Add(Duration::from_secs(60))),
+                K::Char(' ') => dsp!(self, pomo, TogglePause),
+                K::Enter => dsp!(self, pomo, SkipSession),
+                K::Backspace => dsp!(self, core, Msg::ResetWarningShow),
+                K::Char('s') => dsp!(self, router, RouterMsg::GoTo(Page::Settings)),
+                K::Char('t') => dsp!(self, timer, TimerMsg::StartTaskPrompt),
+                K::Char('/') | K::Char('?') => dsp!(self, timer, TimerMsg::ToggleShowKeybinds),
                 _ => {}
             }
         }
@@ -293,11 +278,99 @@ impl TuiRunner {
         if let Event::Key(key) = event {
             match key.code {
                 K::Enter | K::Char('y') => {
-                    self.dispatch_core(Msg::ViewTimerCmd(TimerCmd::PromptTransitionAnsweredYes))
+                    dsp!(
+                        self,
+                        core,
+                        Msg::ViewTimerCmd(TimerCmd::PromptTransitionAnsweredYes)
+                    )
                 }
                 K::Esc | K::Char('n') => {
-                    self.dispatch_core(Msg::ViewTimerCmd(TimerCmd::PromptTransitionAnsweredNo))
+                    dsp!(
+                        self,
+                        core,
+                        Msg::ViewTimerCmd(TimerCmd::PromptTransitionAnsweredNo)
+                    )
                 }
+                _ => {}
+            }
+        }
+    }
+
+    fn handle_timer_edit(&mut self, event: Event) {
+        if let Event::Key(key) = event
+            && let Some(prompt) = self.timer.prompt_state_mut()
+        {
+            match key.code {
+                KeyCode::Up | KeyCode::BackTab => {
+                    if prompt.selected > 0 {
+                        prompt.selected -= 1;
+                    }
+                    if let Some(task) = prompt.suggestions.get(prompt.selected) {
+                        *prompt.text_state.value_mut() = task.name.clone();
+                        let len = prompt.text_state.value().chars().count();
+                        *prompt.text_state.position_mut() = len;
+                    }
+                    self.redraw = true;
+                    return;
+                }
+                KeyCode::Down | KeyCode::Tab => {
+                    if prompt.selected + 1 < prompt.suggestions.len() {
+                        prompt.selected += 1;
+                    }
+                    if let Some(task) = prompt.suggestions.get(prompt.selected) {
+                        *prompt.text_state.value_mut() = task.name.clone();
+                        let len = prompt.text_state.value().chars().count();
+                        *prompt.text_state.position_mut() = len;
+                    }
+                    self.redraw = true;
+                    return;
+                }
+                KeyCode::Enter => {
+                    if let Some(task) = prompt.suggestions.get(prompt.selected) {
+                        let task = task.clone();
+                        dsp!(self, timer, TimerMsg::CancelTaskPrompt);
+                        dsp!(self, core, Msg::Task(TaskMsg::Select(task)));
+                        return;
+                    }
+                }
+                _ => {}
+            }
+
+            prompt.text_state.handle_key_event(key);
+            self.redraw = true;
+
+            if let Some(tasks) = self.core.task_suggestions() {
+                let value = prompt.text_state.value();
+                let prefix = value.to_lowercase();
+                prompt.suggestions = if prefix.is_empty() {
+                    Vec::new()
+                } else {
+                    tasks
+                        .iter()
+                        .filter(|t| t.name.to_lowercase().starts_with(&prefix))
+                        .cloned()
+                        .collect()
+                };
+                if prompt.selected >= prompt.suggestions.len() {
+                    prompt.selected = prompt.suggestions.len().saturating_sub(1);
+                }
+            }
+
+            match prompt.text_state.status() {
+                Status::Done => {
+                    let name = prompt.text_state.value().to_string();
+                    log::debug!("task name: {}", name);
+                    dsp!(self, timer, TimerMsg::CancelTaskPrompt);
+                    dsp!(
+                        self,
+                        core,
+                        Msg::Task(TaskMsg::Add {
+                            name,
+                            description: None,
+                        })
+                    );
+                }
+                Status::Aborted => dsp!(self, timer, TimerMsg::CancelTaskPrompt),
                 _ => {}
             }
         }
@@ -312,35 +385,34 @@ impl TuiRunner {
         use SettingsMsg::*;
         match event {
             Event::Key(key) => match key.code {
-                K::Up | K::Char('k') => self.dispatch_setting(SelectUp),
-                K::BackTab => self.dispatch_setting(SectionPrev),
-                K::Tab => self.dispatch_setting(SectionNext),
-                K::Down | K::Char('j') => self.dispatch_setting(SelectDown),
+                K::Up | K::Char('k') => dsp!(self, setting, SelectUp),
+                K::BackTab => dsp!(self, setting, SectionPrev),
+                K::Tab => dsp!(self, setting, SectionNext),
+                K::Down | K::Char('j') => dsp!(self, setting, SelectDown),
                 K::Enter | K::Char(' ') => {
                     let sel = self.settings.selected();
                     if sel.is_toggle() {
-                        self.dispatch_setting(ApplyEdit(sel.into()));
+                        dsp!(self, setting, ApplyEdit(sel.into()));
                     } else {
-                        let pomo = self.core.config().pomodoro.clone();
-                        self.dispatch_setting(StartEdit(&pomo));
+                        dsp!(self, setting, StartEdit(&self.core.config().pomodoro));
                     }
                 }
-                K::Char('1') => self.dispatch_setting(SectionSelect(0)),
-                K::Char('2') => self.dispatch_setting(SectionSelect(1)),
-                K::Char('3') => self.dispatch_setting(SectionSelect(2)),
-                K::Char('s') => self.dispatch_setting(SaveConfig),
-                K::Char('c') | K::Char('y') => self.dispatch_setting(SelectForCopy),
+                K::Char('1') => dsp!(self, setting, SectionSelect(0)),
+                K::Char('2') => dsp!(self, setting, SectionSelect(1)),
+                K::Char('3') => dsp!(self, setting, SectionSelect(2)),
+                K::Char('s') => dsp!(self, setting, SaveConfig),
+                K::Char('c') | K::Char('y') => dsp!(self, setting, SelectForCopy),
                 K::Char('v') | K::Char('p') => {
-                    let pomo = self.core.config().pomodoro.clone();
-                    self.dispatch_setting(CopyValue(&pomo))
+                    let pomo = &self.core.config().pomodoro;
+                    dsp!(self, setting, CopyValue(pomo));
                 }
-                K::Esc => self.dispatch_router(RouterMsg::GoTo(Page::Timer)),
-                K::Char('/') | K::Char('?') => self.dispatch_setting(ToggleShowKeybinds),
+                K::Esc => dsp!(self, router, RouterMsg::GoTo(Page::Timer)),
+                K::Char('/') | K::Char('?') => dsp!(self, setting, ToggleShowKeybinds),
                 _ => {}
             },
             Event::Mouse(mouse) => match mouse.kind {
-                MouseEventKind::ScrollDown => self.dispatch_setting(ScrollDown),
-                MouseEventKind::ScrollUp => self.dispatch_setting(ScrollUp),
+                MouseEventKind::ScrollDown => dsp!(self, setting, ScrollDown),
+                MouseEventKind::ScrollUp => dsp!(self, setting, ScrollUp),
                 _ => {}
             },
             _ => {}
@@ -348,20 +420,59 @@ impl TuiRunner {
     }
 
     fn handle_settings_edit(&mut self, event: Event) {
-        if let Event::Key(key) = event
-            && let Some(prompt) = self.settings.prompt_state_mut()
-        {
-            prompt.text_state.handle_key_event(key);
-            self.redraw = true;
+        if let Event::Key(key) = event {
+            let is_path = self.settings.selected().is_path();
 
-            match prompt.text_state.status() {
-                Status::Done => {
-                    log::debug!("value {}", prompt.text_state.value());
-                    self.dispatch_setting(SettingsMsg::SaveEdit);
-                    self.dispatch_setting(SettingsMsg::CancelEditing);
+            if is_path {
+                // Navigation for path fields
+                if let Some(prompt) = self.settings.prompt_state_mut() {
+                    match key.code {
+                        KeyCode::Tab
+                            if let Some(name) =
+                                prompt.suggestions.get(prompt.suggested).cloned() =>
+                        {
+                            *prompt.text_state.value_mut() = name;
+                            let len = prompt.text_state.value().chars().count();
+                            *prompt.text_state.position_mut() = len;
+                            self.settings.refresh_path_suggestions();
+                            self.redraw();
+                            return;
+                        }
+                        KeyCode::Up => {
+                            if prompt.suggested > 0 {
+                                prompt.suggested -= 1;
+                            }
+                            prompt.clamp_suggestion_scroll(MAX_VISIBLE_SUGGESTIONS);
+                            self.redraw();
+                            return;
+                        }
+                        KeyCode::Down => {
+                            if prompt.suggested + 1 < prompt.suggestions.len() {
+                                prompt.suggested += 1;
+                            }
+                            prompt.clamp_suggestion_scroll(MAX_VISIBLE_SUGGESTIONS);
+                            self.redraw();
+                            return;
+                        }
+                        _ => {}
+                    }
                 }
-                Status::Aborted => self.dispatch_setting(SettingsMsg::CancelEditing),
-                _ => {}
+                // refresh after updat
+                self.settings.refresh_path_suggestions();
+            }
+            if let Some(prompt) = self.settings.prompt_state_mut() {
+                prompt.text_state.handle_key_event(key);
+                self.redraw = true;
+
+                match prompt.text_state.status() {
+                    Status::Done => {
+                        log::debug!("value {}", prompt.text_state.value());
+                        dsp!(self, setting, SettingsMsg::SaveEdit);
+                        dsp!(self, setting, SettingsMsg::CancelEditing);
+                    }
+                    Status::Aborted => dsp!(self, setting, SettingsMsg::CancelEditing),
+                    _ => {}
+                }
             }
         }
     }
@@ -446,5 +557,76 @@ impl From<SettingsItem> for ConfigMsg {
 impl Default for TickTimer {
     fn default() -> Self {
         Self::new(Duration::from_secs(1))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tick_timer_new_tick_before_interval() {
+        let mut timer = TickTimer::new(Duration::from_secs(60));
+        assert!(!timer.new_tick());
+    }
+
+    #[test]
+    fn tick_timer_new_tick_after_interval() {
+        let mut timer = TickTimer::new(Duration::from_millis(10));
+        std::thread::sleep(Duration::from_millis(15));
+        assert!(timer.new_tick());
+    }
+
+    #[test]
+    fn tick_timer_consecutive_calls() {
+        let mut timer = TickTimer::new(Duration::from_millis(10));
+        std::thread::sleep(Duration::from_millis(15));
+        assert!(timer.new_tick());
+        assert!(!timer.new_tick());
+    }
+
+    #[test]
+    fn tick_timer_time_until_next_initial() {
+        let timer = TickTimer::new(Duration::from_secs(5));
+        let remaining = timer.time_until_next();
+
+        assert!(remaining <= Duration::from_secs(5));
+        assert!(remaining > Duration::from_secs(0));
+    }
+
+    #[test]
+    fn tick_timer_time_until_next_saturates() {
+        let timer = TickTimer::new(Duration::from_millis(10));
+        std::thread::sleep(Duration::from_millis(20));
+
+        // After the interval has passed, time_until_next should not underflow
+        let remaining = timer.time_until_next();
+        assert_eq!(remaining, Duration::ZERO);
+    }
+
+    #[test]
+    fn settings_item_into_config_msg_toggle() {
+        assert_eq!(
+            ConfigMsg::from(SettingsItem::AutoStartOnLaunch),
+            ConfigMsg::AutoStartOnLaunch
+        );
+        assert_eq!(
+            ConfigMsg::from(SettingsItem::TimerAutoFocus),
+            ConfigMsg::TimerAutoFocus
+        );
+        assert_eq!(
+            ConfigMsg::from(SettingsItem::TimerAutoShort),
+            ConfigMsg::TimerAutoShort
+        );
+        assert_eq!(
+            ConfigMsg::from(SettingsItem::TimerAutoLong),
+            ConfigMsg::TimerAutoLong
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "toggle_config_msg called on non-toggle item")]
+    fn settings_item_into_config_msg_non_toggle_panics() {
+        let _: ConfigMsg = SettingsItem::TimerFocus.into();
     }
 }

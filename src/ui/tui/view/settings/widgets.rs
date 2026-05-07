@@ -7,9 +7,24 @@ use tui_widgets::prompts::TextState;
 
 use crate::ui::prelude::*;
 
+pub const MAX_VISIBLE_SUGGESTIONS: usize = 5;
+
 pub struct SettingsPrompt {
     pub text_state: TextState<'static>,
     pub label: String,
+    pub suggestions: Vec<String>,
+    pub suggested: usize,
+    pub suggestion_scroll: usize,
+}
+
+impl SettingsPrompt {
+    pub fn clamp_suggestion_scroll(&mut self, max_visible: usize) {
+        if self.suggested < self.suggestion_scroll {
+            self.suggestion_scroll = self.suggested;
+        } else if self.suggested >= self.suggestion_scroll + max_visible {
+            self.suggestion_scroll = self.suggested - max_visible + 1;
+        }
+    }
 }
 
 /// Represents a section with border

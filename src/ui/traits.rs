@@ -10,7 +10,7 @@ pub trait Runner {
 /// or interacting with the database.
 pub trait EffectHandler {
     /// Execute a command and return any result messages.
-    fn execute(&mut self, cmd: Cmd) -> Vec<Msg>;
+    fn execute(&mut self, cmd: Effect) -> Vec<Msg>;
 }
 
 /// A state machine that processes messages into executable commands.
