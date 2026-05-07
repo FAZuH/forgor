@@ -33,6 +33,7 @@ fn main() -> Result<(), AppError> {
     setup_logging(&conf.logs_path)?;
     color_eyre::install().unwrap();
     info!("initializing {} v{}", tomo::APP_NAME, tomo::APP_VERSION);
+    info!("config dir is: {}", conf.conf_dir.display());
 
     let lock_path = conf.conf_dir.join("tomo.lock");
     let lock_file = std::fs::OpenOptions::new()
