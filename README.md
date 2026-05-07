@@ -7,6 +7,10 @@
 ● <a href="#keybindings">Keybindings</a> ● <a href="#command-line-options">Command Line Options</a> ● <a href="#credit-where-credit-is-due">Credits</a> ● <a href="#license">License</a>
 </div>
 
+<br>
+
+![Demo Animation](docs/demo.webp)
+
 ## Features
 
 - **Pomodoro Timer:** Focus sessions with short and long breaks to maximize productivity
@@ -16,8 +20,6 @@
 - **Hooks Support:** Execute custom commands when sessions start (focus, short break, long break)
 - **Session Alarms:** Optional alarm sounds for session transitions
 - **Lightweight & Fast:** Written in Rust for optimal performance
-
-<img width="1920" height="1200" alt="image" src="https://github.com/user-attachments/assets/29380a2e-6508-4f85-ad1c-f1d78a226be3" />
 
 ## Installation
 
