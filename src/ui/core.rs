@@ -88,6 +88,7 @@ pub struct AppCore<E: EffectHandler> {
     config_snapshot: Config,
     overlay: Option<Overlay>,
     is_quit: bool,
+    task_suggestions_cache: Option<Vec<Task>>,
 }
 
 /// Represents the active modal overlay blocking the main interface.
@@ -124,6 +125,7 @@ impl<E: EffectHandler> AppCore<E> {
             active_session: None,
             overlay,
             is_quit: false,
+            task_suggestions_cache: None,
         }
     }
 
@@ -172,6 +174,10 @@ impl<E: EffectHandler> AppCore<E> {
 
     pub fn current_task(&self) -> Option<&Task> {
         self.current_task.as_ref()
+    }
+
+    pub fn task_suggestions(&self) -> Option<&[Task]> {
+        self.task_suggestions_cache.as_deref()
     }
 
     pub fn is_config_dirty(&self) -> bool {
@@ -251,6 +257,9 @@ impl<E: EffectHandler> Updateable<Msg, Effect> for AppCore<E> {
                         message: "Task created".into(),
                         kind: ToastType::Success,
                     });
+                }
+                TaskResultMsg::FetchedAll(tasks) => {
+                    self.task_suggestions_cache = Some(tasks);
                 }
             },
             Msg::Task(msg) => match msg {
@@ -445,6 +454,9 @@ impl<E: EffectHandler> AppCore<E> {
             TimerCmd::PromptTransitionAnsweredNo => {
                 ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::NextSession)));
                 ret.extend(self.update(Msg::Pomodoro(PomodoroMsg::Pause)))
+            }
+            TimerCmd::FetchAllTasks => {
+                ret.push(Effect::Task(TaskEffect::FetchAll));
             }
         };
         self.set_overlay(None);
@@ -928,6 +940,34 @@ mod tests {
         let cmds = core.translate_timer_cmd(TimerCmd::PromptTransitionAnsweredYes);
 
         assert!(matches!(cmds[0], Effect::StopSound));
+    }
+
+    #[test]
+    fn timer_cmd_fetch_all_tasks() {
+        let mut core = test_appcore();
+        let cmds = core.translate_timer_cmd(TimerCmd::FetchAllTasks);
+
+        assert_eq!(cmds.len(), 2);
+        assert!(matches!(cmds[0], Effect::StopSound));
+        assert!(matches!(cmds[1], Effect::Task(TaskEffect::FetchAll)));
+    }
+
+    #[test]
+    fn task_result_fetched_all_caches() {
+        let mut core = test_appcore();
+        let tasks = vec![Task {
+            id: 1,
+            name: "test".into(),
+            description: None,
+            deadline: None,
+            parent_id: None,
+            project_id: None,
+        }];
+
+        core.update(Msg::TaskResult(TaskResultMsg::FetchedAll(tasks.clone())));
+
+        let cached = core.task_suggestions().unwrap();
+        assert_eq!(cached, tasks.as_slice());
     }
 
     #[test]

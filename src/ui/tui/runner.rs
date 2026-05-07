@@ -317,8 +317,61 @@ impl TuiRunner {
         if let Event::Key(key) = event
             && let Some(prompt) = self.timer.prompt_state_mut()
         {
+            match key.code {
+                KeyCode::Up | KeyCode::BackTab => {
+                    if prompt.selected > 0 {
+                        prompt.selected -= 1;
+                    }
+                    if let Some(task) = prompt.suggestions.get(prompt.selected) {
+                        *prompt.text_state.value_mut() = task.name.clone();
+                        let len = prompt.text_state.value().chars().count();
+                        *prompt.text_state.position_mut() = len;
+                    }
+                    self.redraw = true;
+                    return;
+                }
+                KeyCode::Down | KeyCode::Tab => {
+                    if prompt.selected + 1 < prompt.suggestions.len() {
+                        prompt.selected += 1;
+                    }
+                    if let Some(task) = prompt.suggestions.get(prompt.selected) {
+                        *prompt.text_state.value_mut() = task.name.clone();
+                        let len = prompt.text_state.value().chars().count();
+                        *prompt.text_state.position_mut() = len;
+                    }
+                    self.redraw = true;
+                    return;
+                }
+                KeyCode::Enter => {
+                    if let Some(task) = prompt.suggestions.get(prompt.selected) {
+                        let task = task.clone();
+                        self.dispatch_timer(TimerMsg::CancelTaskPrompt);
+                        self.dispatch_core(Msg::Task(TaskMsg::Select(task)));
+                        return;
+                    }
+                }
+                _ => {}
+            }
+
             prompt.text_state.handle_key_event(key);
             self.redraw = true;
+
+            if let Some(tasks) = self.core.task_suggestions() {
+                let value = prompt.text_state.value();
+                let prefix = value.to_lowercase();
+                prompt.suggestions = if prefix.is_empty() {
+                    Vec::new()
+                } else {
+                    tasks
+                        .iter()
+                        .filter(|t| t.name.to_lowercase().starts_with(&prefix))
+                        .cloned()
+                        .collect()
+                };
+                if prompt.selected >= prompt.suggestions.len() {
+                    prompt.selected = prompt.suggestions.len().saturating_sub(1);
+                }
+            }
 
             match prompt.text_state.status() {
                 Status::Done => {

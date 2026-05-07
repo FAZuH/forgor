@@ -126,6 +126,16 @@ impl TaskRepo for SqliteTaskRepo {
 
         Ok(row.into())
     }
+
+    fn all_tasks(&self) -> RepoResult<Vec<Task>> {
+        use crate::repo::schema::tasks::*;
+        let rows = table
+            .order(name.asc())
+            .select(TaskRow::as_select())
+            .load(&mut self.pool.get()?)?;
+
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
 }
 
 #[derive(Clone)]

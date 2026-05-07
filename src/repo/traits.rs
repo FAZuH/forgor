@@ -11,6 +11,8 @@ pub trait TaskRepo {
     fn add(&self, name: String, description: Option<String>) -> RepoResult<Task>;
 
     fn find_by_name(&self, name: String) -> RepoResult<Task>;
+
+    fn all_tasks(&self) -> RepoResult<Vec<Task>>;
 }
 
 pub trait SessionRepo {

@@ -32,6 +32,8 @@ pub struct TuiTimerView {
 
 pub struct TimerPrompt {
     pub text_state: TextState<'static>,
+    pub suggestions: Vec<Task>,
+    pub selected: usize,
 }
 
 impl TuiTimerView {
@@ -125,19 +127,29 @@ impl TuiTimerView {
 
     fn prompt_task(&mut self, frame: &mut Frame, area: Rect) {
         if let Some(ref mut prompt) = self.prompt {
-            let buf = frame.buffer_mut();
             let popup_width = 40.min(area.width.saturating_sub(4));
             let inner_width = popup_width.saturating_sub(2).max(1);
             let text_len = prompt.text_state.value().chars().count() as u16;
             let prefix_len = 5;
             let lines_needed = (text_len + prefix_len) / inner_width + 1;
-            let popup_height = (lines_needed + 2).max(3).min(area.height);
+            let prompt_input_height = lines_needed;
+
+            let max_visible = 5;
+            let num_suggestions = (prompt.suggestions.len() as u16).min(max_visible);
+            let suggestions_height = if prompt.suggestions.is_empty() {
+                0
+            } else {
+                num_suggestions + 1 // +1 separator line
+            };
+            let popup_height = (prompt_input_height + suggestions_height + 2).min(area.height);
+
             let vertical = Layout::vertical([Constraint::Length(popup_height)]).flex(Flex::Center);
             let horizontal =
                 Layout::horizontal([Constraint::Length(popup_width)]).flex(Flex::Center);
             let [popup_area] = vertical.areas(area);
             let [popup_area] = horizontal.areas(popup_area);
 
+            let buf = frame.buffer_mut();
             Clear.render(popup_area, buf);
 
             let block = Block::default()
@@ -147,7 +159,45 @@ impl TuiTimerView {
             let inner = block.inner(popup_area);
             block.render(popup_area, buf);
 
-            TextPrompt::new(Cow::Borrowed("")).draw(frame, inner, &mut prompt.text_state);
+            if prompt.suggestions.is_empty() {
+                TextPrompt::new(Cow::Borrowed("")).draw(frame, inner, &mut prompt.text_state);
+                return;
+            }
+
+            let [prompt_area, rest_area] =
+                Layout::vertical([Constraint::Length(prompt_input_height), Constraint::Fill(1)])
+                    .areas(inner);
+
+            let [sep_area, list_area] =
+                Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(rest_area);
+
+            let sep = Line::from("─".repeat(inner_width as usize))
+                .style(Style::default().fg(Color::DarkGray));
+            Paragraph::new(sep).render(sep_area, buf);
+
+            let selected_style = Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::REVERSED);
+            let dim = Style::default().dim();
+
+            let suggestion_lines: Vec<Line> = prompt
+                .suggestions
+                .iter()
+                .enumerate()
+                .take(max_visible as usize)
+                .map(|(idx, task)| {
+                    let style = if idx == prompt.selected {
+                        selected_style
+                    } else {
+                        dim
+                    };
+                    Line::styled(format!(" {name}", name = task.name), style)
+                })
+                .collect();
+
+            Paragraph::new(suggestion_lines).render(list_area, buf);
+
+            TextPrompt::new(Cow::Borrowed("")).draw(frame, prompt_area, &mut prompt.text_state);
         }
     }
 
@@ -387,7 +437,12 @@ impl Updateable<TimerMsg, TimerCmd> for TuiTimerView {
             }
             StartTaskPrompt => {
                 let text_state = TextState::new().with_focus(FocusState::Focused);
-                self.prompt = Some(TimerPrompt { text_state });
+                self.prompt = Some(TimerPrompt {
+                    text_state,
+                    suggestions: Vec::new(),
+                    selected: 0,
+                });
+                return vec![TimerCmd::FetchAllTasks];
             }
             CancelTaskPrompt => {
                 self.prompt = None;
@@ -409,5 +464,34 @@ impl TuiTimerView {
 
     pub fn prompt_state_mut(&mut self) -> Option<&mut TimerPrompt> {
         self.prompt.as_mut()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ui::update::TimerCmd;
+
+    #[test]
+    fn start_task_prompt_emits_fetch_all() {
+        let mut view = TuiTimerView::new();
+
+        let cmds = view.update(TimerMsg::StartTaskPrompt);
+
+        assert!(view.prompt.is_some());
+        assert_eq!(cmds.len(), 1);
+        assert!(matches!(cmds[0], TimerCmd::FetchAllTasks));
+    }
+
+    #[test]
+    fn cancel_task_prompt_clears_prompt() {
+        let mut view = TuiTimerView::new();
+        view.update(TimerMsg::StartTaskPrompt);
+        assert!(view.prompt.is_some());
+
+        let cmds = view.update(TimerMsg::CancelTaskPrompt);
+
+        assert!(view.prompt.is_none());
+        assert!(cmds.is_empty());
     }
 }

@@ -99,6 +99,13 @@ impl EffectHandler for TuiEffectHandler {
                         })),
                     }
                 }
+                TaskEffect::FetchAll => match self.repo.task().all_tasks() {
+                    Ok(tasks) => ret.push(Msg::TaskResult(TaskResultMsg::FetchedAll(tasks))),
+                    Err(e) => ret.extend(self.execute(Effect::ShowToast {
+                        message: format!("Error fetching tasks: {e}"),
+                        kind: ToastType::Error,
+                    })),
+                },
             },
         }
         ret

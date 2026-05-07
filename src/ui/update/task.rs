@@ -16,9 +16,11 @@ pub enum TaskEffect {
         name: String,
         description: Option<String>,
     },
+    FetchAll,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TaskResultMsg {
     Added(Task),
+    FetchedAll(Vec<Task>),
 }
