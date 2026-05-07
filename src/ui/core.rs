@@ -481,6 +481,9 @@ impl<E: EffectHandler> AppCore<E> {
             }
             SettingsCmd::SaveConfig => {
                 ret.push(Effect::SaveConfig(Box::new(self.config().clone())));
+                let c = &self.config.pomodoro.timer;
+                self.pomodoro
+                    .update_settings(c.focus, c.long, c.short, c.long_interval);
                 self.update_config_snapshot();
             }
             SettingsCmd::ShowToast { message, r#type } => {
